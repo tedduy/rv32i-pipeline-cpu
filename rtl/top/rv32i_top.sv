@@ -44,7 +44,10 @@ module rv32i_top #(
     output logic         W_jalr,
     // Pipeline control signals
     output logic         W_stall,
-    output logic         W_flush
+    output logic         W_flush,
+    // Additional debug signals
+    output logic [N-1:0] W_immediate,
+    output logic         W_ALUSrc,
 );
 
     // ==========================================================================
@@ -209,6 +212,8 @@ module rv32i_top #(
     assign W_jalr         = ex_jalr;
     assign W_stall        = stall_if_id;
     assign W_flush        = flush_id_ex | flush_if_id;
+    assign W_immediate    = wb_immediate;
+    assign W_ALUSrc       = ex_alu_src;
     
     // ==========================================================================
     // STAGE 1: INSTRUCTION FETCH (IF)

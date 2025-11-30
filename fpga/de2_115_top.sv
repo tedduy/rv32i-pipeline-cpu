@@ -58,7 +58,7 @@ module de2_115_top (
             sw17_sync1 <= 1'b0;
             sw17_sync2 <= 1'b0;
         end else begin
-            sw17_sync1 <= SW[17];
+            sw17_sync1 <= SW[16];
             sw17_sync2 <= sw17_sync1;
         end
     end
@@ -88,6 +88,8 @@ module de2_115_top (
     logic        W_jalr;
     logic        W_stall;
     logic        W_flush;
+    logic [31:0] W_immediate;
+    logic        W_ALUSrc;
     
     // ==========================================================================
     // CPU INSTANTIATION
@@ -116,7 +118,9 @@ module de2_115_top (
         .W_jal         (W_jal),
         .W_jalr        (W_jalr),
         .W_stall       (W_stall),
-        .W_flush       (W_flush)
+        .W_flush       (W_flush),
+        .W_immediate   (W_immediate),
+        .W_ALUSrc      (W_ALUSrc)
     );
     
     // ==========================================================================

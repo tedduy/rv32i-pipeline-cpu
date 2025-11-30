@@ -24,6 +24,8 @@ module tb_rv32i_pipeline #(
     logic         W_branch_taken, W_jal, W_jalr;
     logic [N-1:0] W_mem_addr, W_mem_wdata, W_mem_rdata;
     logic         W_stall, W_flush;
+    logic [N-1:0] W_immediate;
+    logic         W_ALUSrc;
     
     //==========================================================================
     // DUT Instantiation
@@ -52,7 +54,9 @@ module tb_rv32i_pipeline #(
         .W_mem_wdata (W_mem_wdata),
         .W_mem_rdata (W_mem_rdata),
         .W_stall     (W_stall),
-        .W_flush     (W_flush)
+        .W_flush     (W_flush),
+        .W_immediate (W_immediate),
+        .W_ALUSrc    (W_ALUSrc)
     );
     
     //==========================================================================
