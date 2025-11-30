@@ -47,7 +47,7 @@ module rv32i_top #(
     output logic         W_flush,
     // Additional debug signals
     output logic [N-1:0] W_immediate,
-    output logic         W_ALUSrc,
+    output logic         W_ALUSrc
 );
 
     // ==========================================================================

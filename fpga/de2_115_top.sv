@@ -91,6 +91,9 @@ module de2_115_top (
     logic [31:0] W_immediate;
     logic        W_ALUSrc;
     
+    // Decode ALUSrc from instruction opcode
+    logic        alu_uses_imm;
+    
     // ==========================================================================
     // CPU INSTANTIATION
     // ==========================================================================
@@ -154,13 +157,30 @@ module de2_115_top (
         MODE_ALU_OUT     = 3'b010,  // ALU output
         MODE_WB_DATA     = 3'b011,  // Writeback data
         MODE_RD1         = 3'b100,  // Register read data 1
-        MODE_RD2         = 3'b101,  // Register read data 2
+        MODE_ALU_SRC     = 3'b101,  // ALU Source (RD2 or IMM based on ALUSrc)
         MODE_MEM_ADDR    = 3'b110,  // Memory address
         MODE_CYCLE_CNT   = 3'b111   // Cycle counter
     } debug_mode_t;
     
     debug_mode_t debug_mode;
     assign debug_mode = debug_mode_t'(SW[2:0]);
+    
+    // Decode if instruction uses immediate (synchronized with W_instruction at WB stage)
+    logic [6:0] opcode;
+    assign opcode = W_instruction[6:0];
+    
+    always_comb begin
+        case (opcode)
+            7'b0010011,  // OP_IMM (I-type ALU)
+            7'b0000011,  // LOAD
+            7'b0100011,  // STORE
+            7'b0010111,  // AUIPC
+            7'b1100111:  // JALR
+                alu_uses_imm = 1'b1;
+            default:
+                alu_uses_imm = 1'b0;
+        endcase
+    end
     
     logic [31:0] display_value;
     
@@ -171,7 +191,7 @@ module de2_115_top (
             MODE_ALU_OUT:     display_value = W_ALUout;
             MODE_WB_DATA:     display_value = W_WB_data;
             MODE_RD1:         display_value = W_RD1;
-            MODE_RD2:         display_value = W_RD2;
+            MODE_ALU_SRC:     display_value = alu_uses_imm ? W_immediate : W_RD2;  // Show actual ALU operand B
             MODE_MEM_ADDR:    display_value = W_mem_addr;
             MODE_CYCLE_CNT:   display_value = cycle_counter;
             default:          display_value = W_PC_out;
@@ -269,7 +289,7 @@ endmodule
 //   010: ALU Output
 //   011: Writeback Data
 //   100: Register Read Data 1 (RD1)
-//   101: Register Read Data 2 (RD2)
+//   101: ALU Source (RD2 or IMM - shows actual value used in ALU)
 //   110: Memory Address
 //   111: Cycle Counter
 //
