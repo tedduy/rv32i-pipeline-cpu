@@ -29,6 +29,7 @@
 /rtl_work/
 transcript
 /thesis/
+*.md.backup
 
 # ============================================================
 # FPGA - Quartus Generated Files (Keep source, ignore build)

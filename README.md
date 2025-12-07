@@ -1,184 +1,153 @@
-# RV32I Pipeline CPU - 5-Stage Implementation
+# RV32I 5-Stage Pipeline CPU
 
-## Mục đích
+![Status](https://img.shields.io/badge/Status-Verified-success)
+![ISA](https://img.shields.io/badge/ISA-RV32I-blue)
+![FPGA](https://img.shields.io/badge/FPGA-DE2--115-orange)
 
-Dự án này là một **CPU RISC-V RV32I 5-stage pipeline** được implement hoàn chỉnh bằng SystemVerilog, hỗ trợ đầy đủ 37 instructions cơ bản của RV32I ISA.
+## Tổng quan
 
-**Dành cho:**
-- Học tập kiến trúc máy tính và thiết kế CPU
-- Hiểu rõ cơ chế pipeline và xử lý hazards
-- Đồ án tốt nghiệp / Thesis về Computer Architecture
-- Thực hành thiết kế digital với FPGA
-- Nghiên cứu RISC-V ISA
+Bộ vi xử lý **RISC-V 32-bit (RV32I)** theo kiến trúc **5-stage pipeline** (IF, ID, EX, MEM, WB) bằng **SystemVerilog**.
 
-## Tính năng
+**Tính năng:**
+- ✅ Hỗ trợ đầy đủ 37 instructions RV32I
+- ✅ Data Forwarding (Data Bypassing)
+- ✅ Hazard Detection & Pipeline Stall
+- ✅ Branch/Jump Flushing
+- ✅ CPI = 1.12, IPC = 0.89 (hiệu suất 89%)
+- ✅ 100% kiểm chứng thành công (51/51 test cases)
+- ✅ Triển khai thành công trên FPGA DE2-115
 
-- ✅ **Full RV32I ISA** - 37 instructions
-- ✅ **5-Stage Pipeline** - IF → ID → EX → MEM → WB
-- ✅ **Data Forwarding** - Giảm thiểu pipeline stalls
-- ✅ **Hazard Detection** - Xử lý load-use và control hazards
-- ✅ **Branch/Jump Support** - Với pipeline flushing
-- ✅ **100% Verified** - 51/51 register writes verified
-- ✅ **FPGA Tested** - Chạy thành công trên DE2-115
+---
 
-## How to Run
+## Kiến trúc Pipeline
+
+```
+┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐
+│ IF  │ -> │ ID  │ -> │ EX  │ -> │ MEM │ -> │ WB  │
+└─────┘    └─────┘    └─────┘    └─────┘    └─────┘
+```
+
+**5 Stages:**
+1. **IF**: Instruction Fetch (PC + Instruction Memory)
+2. **ID**: Instruction Decode (Control Unit + Register File + Immediate Gen)
+3. **EX**: Execute (ALU + Branch + Jump + Forwarding Unit)
+4. **MEM**: Memory Access (Data Memory + Load/Store Unit)
+5. **WB**: Write Back (ghi kết quả về Register File)
+
+**Hazard Handling:**
+- Data Forwarding Unit: giải quyết RAW hazards
+- Hazard Detection Unit: phát hiện Load-Use hazards
+- Pipeline Flushing: xử lý Branch/Jump
+
+---
+
+## Cấu trúc Dự án
+
+```
+rv32i-pipeline-cpu/
+├── rtl/                    # Mã nguồn RTL
+│   ├── top/                # rv32i_top.sv
+│   ├── core/
+│   │   ├── stages/         # ALU, Control, RegFile, Memory...
+│   │   ├── pipeline/       # IF_ID, ID_EX, EX_MEM, MEM_WB
+│   │   └── hazard/         # Forwarding, Hazard Detection
+│   └── common/             # Adder, Mux
+├── tb/                     # Testbenches
+│   ├── unit_test/          # 10 unit tests
+│   └── tb_full_verification.sv  # Test chính (51 cases)
+├── fpga/                   # FPGA DE2-115
+│   ├── de2_115_top.sv
+│   └── de2_115_pins.tcl
+├── docs/                   # Tài liệu
+├── thesis/                 # Luận văn LaTeX
+└── Makefile
+```
+
+---
+
+## Hướng dẫn Sử dụng
 
 ### Yêu cầu
-- QuestaSim hoặc ModelSim
-- Python 3.6+
-- Make (optional)
+- QuestaSim/ModelSim (SystemVerilog simulator)
+- Intel Quartus Prime (cho FPGA)
+- Make, Bash
 
-### 1. Chạy Unit Tests (10 tests)
-
-Test từng module riêng lẻ:
+### Chạy Simulation
 
 ```bash
-# Chạy tất cả unit tests
+# Clone dự án
+git clone <repo-url>
+cd rv32i-pipeline-cpu
+
+# Chạy Full Verification (quan trọng nhất)
+make verify
+
+# Chạy Unit Tests (10 tests)
 make unit
 
 # Chạy test cụ thể
 make run TB=tb_alu_unit
-make run TB=tb_control_unit
 
 # Xem waveform
-make wave TB=tb_alu_unit
-```
+make wave TB=tb_full_verification
 
-### 2. Chạy Pipeline Integration Test
-
-Test toàn bộ pipeline với 75 instructions:
-
-```bash
-make pipeline
-```
-
-### 3. Chạy Full Verification
-
-Verify 51 register writes với expected values:
-
-```bash
-make verify
-```
-
-### 4. Chạy tất cả tests
-
-```bash
-# Compile + unit tests + pipeline + verification
-make all
-```
-
-### 5. Các lệnh khác
-
-```bash
-# Compile only
-make compile
-
-# Clean
-make clean
-
-# Help
+# Xem tất cả lệnh
 make help
+
+# Dọn dẹp
+make clean
 ```
 
-## Kết quả mong đợi
+### FPGA Implementation
 
-### Unit Tests
+Chi tiết xem: [`fpga/README.md`](fpga/README.md)
+
+```bash
+# Mở Quartus Prime → Open Project: fpga/rv32i_top.qpf
+# Processing → Start Compilation
+# Tools → Programmer → Program FPGA
 ```
-==========================================
-Running All Unit Tests (10 tests)
-==========================================
-
---- Running: tb_alu_unit ---
-✓ PASSED (11 tests)
-
---- Running: tb_reg_file ---
-✓ PASSED (10 tests)
-
-...
-
-==========================================
-✓ Unit tests complete: 10/10 PASSED
-✓ Logs saved in: sim/logs/
-==========================================
-```
-
-### Full Verification
-```
-✓✓✓ FULL VERIFICATION PASSED! ✓✓✓
-
-Summary:
-  • 76 instructions executed successfully
-  • 51/51 register writes verified (100.0%)
-  • 0 errors, 0 critical warnings
-
-CPU IS FUNCTIONALLY CORRECT!
-```
-
-## Performance
-
-- **CPI (Cycles Per Instruction)**: 1.12
-- **Pipeline Efficiency**: 89.3%
-- **Fmax (FPGA)**: 63.34 MHz
-- **Target Clock**: 50 MHz
-
-## Cấu trúc dự án
-
-```
-rv32i-pipeline-cpu/
-├── rtl/                    # RTL source code
-│   ├── core/              # Core CPU modules
-│   │   ├── stages/        # Pipeline stages (ALU, Control, etc.)
-│   │   ├── pipeline/      # Pipeline registers
-│   │   └── hazard/        # Hazard detection & forwarding
-│   ├── common/            # Common modules (mux, adder)
-│   └── top/               # Top-level module
-├── tb/                    # Testbenches
-│   ├── unit_test/         # Unit tests (10 tests)
-│   ├── tb_rv32i_pipeline.sv      # Pipeline integration test
-│   └── tb_full_verification.sv   # Full verification test
-├── sim/                   # Simulation files
-│   ├── logs/              # Log files
-│   └── scripts/           # Python automation scripts
-├── fpga/                  # FPGA implementation (DE2-115)
-├── docs/                  # Documentation
-├── Makefile              # Build automation
-├── compile.f             # File list for compilation
-└── README.md             # This file
-```
-
-## Supported Instructions (37)
-
-- **Arithmetic & Logic (10)**: ADD, SUB, AND, OR, XOR, SLT, SLTU, SLL, SRL, SRA
-- **Immediate (9)**: ADDI, ANDI, ORI, XORI, SLTI, SLTIU, SLLI, SRLI, SRAI
-- **Load/Store (8)**: LW, LH, LB, LHU, LBU, SW, SH, SB
-- **Branch (6)**: BEQ, BNE, BLT, BGE, BLTU, BGEU
-- **Jump (2)**: JAL, JALR
-- **Upper Immediate (2)**: LUI, AUIPC
-
-## Documentation
-
-- `README.md` - Project overview (this file)
-- `tb/unit_test/README.md` - Unit tests documentation
-- `docs/VERIFICATION_REPORT.md` - Verification report
-- `docs/PERFORMANCE_ANALYSIS.md` - Performance analysis
-- `fpga/README.md` - FPGA implementation guide
-
-## FPGA Implementation
-
-Đã test thành công trên **Terasic DE2-115**:
-- FPGA: Cyclone IV E EP4CE115F29C7
-- Clock: 50 MHz
-- Resource: ~10% Logic Elements
-- Debug features: 8 display modes, 9 status LEDs
-
-Xem `fpga/README.md` để biết chi tiết.
-
-## License
-
-Educational purposes only.
 
 ---
 
-**Status:** ✅ Fully verified and tested
+## Kết quả Kiểm chứng
 
-**Last Updated:** December 7, 2025
+**Simulation Results:**
+```
+Total Cycles:        84
+Total Instructions:  75
+CPI:                 1.12
+IPC:                 0.89
+Test Cases:          51/51 PASSED ✓
+```
+
+**Performance:**
+| Metric | Value | Ideal | Efficiency |
+|--------|-------|-------|------------|
+| CPI | 1.12 | 1.00 | 89.3% |
+| IPC | 0.89 | 1.00 | 89.0% |
+
+**Test Coverage:**
+- ✅ 37/37 instructions (R, I, Load, Store, Branch, Jump, U-type)
+- ✅ Data forwarding
+- ✅ Hazard detection
+- ✅ Branch/Jump flushing
+
+Chi tiết: [`docs/VERIFICATION_REPORT.md`](docs/VERIFICATION_REPORT.md)
+
+---
+
+## Tài liệu
+
+- [`docs/VERIFICATION_REPORT.md`](docs/VERIFICATION_REPORT.md) - Báo cáo kiểm chứng
+- [`docs/PERFORMANCE_ANALYSIS.md`](docs/PERFORMANCE_ANALYSIS.md) - Phân tích hiệu năng
+- [`fpga/README.md`](fpga/README.md) - Hướng dẫn FPGA
+- [`thesis/README.md`](thesis/README.md) - Biên dịch luận văn
+
+**RISC-V References:**
+- [RISC-V ISA Specification](https://riscv.org/technical/specifications/)
+- RV32I Base Integer v2.2
+
+---
+
+**© 2025 RV32I Pipeline CPU Project**
