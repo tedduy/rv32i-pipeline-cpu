@@ -1,12 +1,39 @@
 # ==============================================================================
-# Makefile for RV32I Pipeline CPU
-# Automation for compilation, simulation, and verification
+# Makefile for RV32I Pipeline CPU - QuestaSim
 # ==============================================================================
 
-.PHONY: help all clean compile sim verify info check-tools show-log
+.PHONY: help all clean compile run unit pipeline verify
 
 # Default target
 .DEFAULT_GOAL := help
+
+# ==============================================================================
+# Configuration
+# ==============================================================================
+
+# Simulator
+SIM = vsim
+VLOG = vlog
+VLIB = vlib
+
+# Directories
+WORK_DIR = work
+SIM_DIR = sim
+LOG_DIR = logs
+
+# Compile flags
+VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
+
+# Simulation flags
+VSIM_FLAGS = -c -work $(WORK_DIR)
+
+# File lists
+COMPILE_LIST = compile.f
+
+# Unit test list
+UNIT_TESTS = tb_alu_unit tb_reg_file tb_imm_gen tb_branch_unit \
+             tb_jump_unit tb_load_store_unit tb_control_unit tb_program_counter \
+             tb_instruction_mem tb_data_memory
 
 # ==============================================================================
 # Help
@@ -18,20 +45,28 @@ help:
 	@echo "=========================================="
 	@echo ""
 	@echo "Main Commands:"
-	@echo "  make all          - Compile and run basic simulation"
-	@echo "  make verify       - Run full verification (51/51 tests)"
-	@echo "  make compile      - Compile RTL and testbench only"
-	@echo "  make clean        - Clean all generated files"
+	@echo "  make compile          - Compile all RTL and testbench"
+	@echo "  make run TB=<name>    - Run specific testbench"
+	@echo "  make wave TB=<name>   - Run with waveform viewer (GUI)"
+	@echo "  make unit             - Run all unit tests (10 tests)"
+	@echo "  make pipeline         - Run pipeline integration test"
+	@echo "  make verify           - Run full verification test"
+	@echo "  make all              - Compile + run all tests"
+	@echo "  make clean            - Clean generated files"
 	@echo ""
-	@echo "Utilities:"
-	@echo "  make info         - Show project information"
-	@echo "  make check-tools  - Check required tools"
-	@echo "  make show-log     - Show simulation log"
-	@echo "  make help         - Show this help"
+	@echo "Examples:"
+	@echo "  make run TB=tb_alu_unit           - Test ALU only"
+	@echo "  make wave TB=tb_alu_unit          - View ALU waveform"
+	@echo "  make run TB=tb_rv32i_pipeline     - Test pipeline"
+	@echo "  make unit                         - Test all 10 units"
 	@echo ""
-	@echo "Quick Start:"
-	@echo "  make verify       - Recommended: Full verification"
-	@echo "  make all          - Basic simulation"
+	@echo "Unit Tests Available:"
+	@echo "  tb_alu_unit, tb_reg_file, tb_imm_gen, tb_branch_unit"
+	@echo "  tb_jump_unit, tb_load_store_unit, tb_control_unit, tb_program_counter"
+	@echo "  tb_instruction_mem, tb_data_memory"
+	@echo ""
+	@echo "Integration Tests:"
+	@echo "  tb_rv32i_pipeline, tb_full_verification"
 	@echo ""
 	@echo "=========================================="
 
@@ -39,206 +74,194 @@ help:
 # Main Targets
 # ==============================================================================
 
-# Compile and run basic simulation
-all:
-	@echo "=========================================="
-	@echo "Compiling and Running RV32I Pipeline CPU"
-	@echo "=========================================="
-	@cd sim/scripts && python3 compile_and_run.py
-
-# Run full verification (recommended)
-verify:
-	@echo "=========================================="
-	@echo "Running Full Verification (76 instructions)"
-	@echo "=========================================="
-	@cd sim/scripts && python3 run_full_verification.py
-
-# Compile only (no simulation)
+# Compile all RTL and testbench
 compile:
-	@echo "Compiling RV32I Pipeline CPU..."
-	@cd sim/scripts && python3 compile_and_run.py --compile-only 2>/dev/null || \
-	(cd sim && vlog -work work ../tb/tb_rv32i_pipeline.sv && echo "✓ Compilation complete")
+	@echo "=========================================="
+	@echo "Compiling RTL and Testbench..."
+	@echo "=========================================="
+	@if [ ! -d $(WORK_DIR) ]; then $(VLIB) $(WORK_DIR); fi
+	@$(VLOG) $(VLOG_FLAGS) -f $(COMPILE_LIST)
+	@echo ""
+	@echo "✓ Compilation complete!"
+	@echo "=========================================="
 
-# Run simulation only (assumes already compiled)
-sim:
-	@echo "Running simulation..."
-	@cd sim && vsim -c -lib work work.tb_rv32i_pipeline -do "run -all; quit -f"
+# Run specific testbench
+run: compile
+	@if [ -z "$(TB)" ]; then \
+		echo "Error: Please specify TB=<testbench_name>"; \
+		echo "Example: make run TB=tb_alu_unit"; \
+		exit 1; \
+	fi
+	@mkdir -p $(LOG_DIR)
+	@echo "=========================================="
+	@echo "Running: $(TB)"
+	@echo "=========================================="
+	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).$(TB) -do "run -all; quit -f" | tee $(LOG_DIR)/$(TB).log
+	@echo ""
+	@echo "✓ Simulation complete!"
+	@echo "✓ Log saved: $(LOG_DIR)/$(TB).log"
+	@echo "=========================================="
+
+# Run with waveform viewer
+wave: compile
+	@if [ -z "$(TB)" ]; then \
+		echo "Error: Please specify TB=<testbench_name>"; \
+		echo "Example: make wave TB=tb_alu_unit"; \
+		exit 1; \
+	fi
+	@echo "=========================================="
+	@echo "Running with GUI: $(TB)"
+	@echo "=========================================="
+	@$(SIM) -gui $(WORK_DIR).$(TB) -do "add wave -r /*; run -all"
+
+# Run all unit tests (clean output)
+unit: compile
+	@mkdir -p $(LOG_DIR)
+	@echo "=========================================="
+	@echo "Running All Unit Tests (10 tests)"
+	@echo "=========================================="
+##	@echo "" > $(LOG_DIR)/unit_tests_summary.log
+	@passed=0; total=0; \
+	for test in $(UNIT_TESTS); do \
+		echo ""; \
+		echo "--- Running: $$test ---"; \
+		$(SIM) $(VSIM_FLAGS) $(WORK_DIR).$$test -do "run -all; quit -f" > $(LOG_DIR)/$$test.log 2>&1; \
+		if grep -q "ALL TESTS PASSED" $(LOG_DIR)/$$test.log; then \
+			count=$$(grep "Passed:" $(LOG_DIR)/$$test.log | tail -1 | sed 's/.*Passed: \([0-9]*\).*/\1/'); \
+			echo "✓ PASSED ($$count tests)"; \
+			echo "$$test: PASSED ($$count tests)" >> $(LOG_DIR)/unit_tests_summary.log; \
+			passed=$$((passed + 1)); \
+		else \
+			echo "✗ FAILED (see log for details)"; \
+			echo "$$test: FAILED" >> $(LOG_DIR)/unit_tests_summary.log; \
+		fi; \
+		total=$$((total + 1)); \
+	done; \
+	echo ""; \
+	echo "=========================================="; \
+	echo "✓ Unit tests complete: $$passed/$$total PASSED"; \
+	echo "✓ Logs saved in: $(LOG_DIR)/"; \
+	echo "=========================================="
+
+# Run pipeline integration test (clean output)
+pipeline: compile
+	@mkdir -p $(LOG_DIR)
+	@echo "=========================================="
+	@echo "Running Pipeline Integration Test"
+	@echo "=========================================="
+	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).tb_rv32i_pipeline -do "run -all; quit -f" > $(LOG_DIR)/tb_rv32i_pipeline.log 2>&1
+	@echo ""
+	@if grep -q "Test Status: PASSED" $(LOG_DIR)/tb_rv32i_pipeline.log; then \
+		echo "✓ Pipeline test PASSED"; \
+		grep "Total Instructions Executed:" $(LOG_DIR)/tb_rv32i_pipeline.log | sed 's/#//g' | xargs echo "  "; \
+		grep "CPI (Cycles Per Instruction):" $(LOG_DIR)/tb_rv32i_pipeline.log | sed 's/#//g' | xargs echo "  "; \
+	else \
+		echo "✗ Pipeline test FAILED or status unknown"; \
+	fi
+	@echo "✓ Log saved: $(LOG_DIR)/tb_rv32i_pipeline.log"
+	@echo "=========================================="
+
+# Run full verification test (clean output)
+verify: compile
+	@mkdir -p $(LOG_DIR)
+	@echo "=========================================="
+	@echo "Running Full Verification Test"
+	@echo "=========================================="
+	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).tb_full_verification -do "run -all; quit -f" > $(LOG_DIR)/tb_full_verification.log 2>&1
+	@echo ""
+	@if grep -q "Verification Summary" $(LOG_DIR)/tb_full_verification.log; then \
+		echo "✓ Verification test PASSED"; \
+		grep "Total Instructions Executed:" $(LOG_DIR)/tb_full_verification.log | sed 's/#//g' | xargs echo "  "; \
+		grep "Instructions Checked:" $(LOG_DIR)/tb_full_verification.log | sed 's/#//g' | xargs echo "  "; \
+		errors=$$(grep "Errors:" $(LOG_DIR)/tb_full_verification.log | tail -1 | sed 's/.*Errors: \([0-9]*\).*/\1/'); \
+		if [ "$$errors" = "0" ]; then \
+			echo "  ✓ No errors found"; \
+		else \
+			echo "  ✗ $$errors errors found"; \
+		fi; \
+	else \
+		echo "✗ Verification test FAILED or status unknown"; \
+	fi
+	@echo "✓ Log saved: $(LOG_DIR)/tb_full_verification.log"
+	@echo "=========================================="
+
+# Compile and run all tests
+all: compile
+	@mkdir -p $(LOG_DIR)
+	@echo "=========================================="
+	@echo "Running All Tests"
+	@echo "=========================================="
+	@echo ""
+	@echo "=== Unit Tests (10 tests) ==="
+	@echo "" > $(LOG_DIR)/unit_tests_summary.log
+	@passed=0; total=0; \
+	for test in $(UNIT_TESTS); do \
+		echo "Running: $$test..."; \
+		$(SIM) $(VSIM_FLAGS) $(WORK_DIR).$$test -do "run -all; quit -f" > $(LOG_DIR)/$$test.log 2>&1; \
+		if grep -q "ALL TESTS PASSED" $(LOG_DIR)/$$test.log; then \
+			count=$$(grep "Passed:" $(LOG_DIR)/$$test.log | tail -1 | sed 's/.*Passed: \([0-9]*\).*/\1/'); \
+			echo "  ✓ $$test: PASSED ($$count tests)"; \
+			echo "$$test: PASSED ($$count tests)" >> $(LOG_DIR)/unit_tests_summary.log; \
+			passed=$$((passed + 1)); \
+		else \
+			echo "  ✗ $$test: FAILED"; \
+			echo "$$test: FAILED" >> $(LOG_DIR)/unit_tests_summary.log; \
+		fi; \
+		total=$$((total + 1)); \
+	done; \
+	echo "Unit tests: $$passed/$$total PASSED"; \
+	echo ""
+	@echo "=== Pipeline Integration Test ==="
+	@echo "Running: tb_rv32i_pipeline..."
+	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).tb_rv32i_pipeline -do "run -all; quit -f" > $(LOG_DIR)/tb_rv32i_pipeline.log 2>&1
+	@if grep -q "Test Status: PASSED" $(LOG_DIR)/tb_rv32i_pipeline.log; then \
+		echo "  ✓ Pipeline test: PASSED"; \
+	else \
+		echo "  ✗ Pipeline test: FAILED"; \
+	fi
+	@echo ""
+	@echo "=== Full Verification Test ==="
+	@echo "Running: tb_full_verification..."
+	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).tb_full_verification -do "run -all; quit -f" > $(LOG_DIR)/tb_full_verification.log 2>&1
+	@if grep -q "Verification Summary" $(LOG_DIR)/tb_full_verification.log; then \
+		errors=$$(grep "Errors:" $(LOG_DIR)/tb_full_verification.log | tail -1 | sed 's/.*Errors: \([0-9]*\).*/\1/'); \
+		if [ "$$errors" = "0" ]; then \
+			echo "  ✓ Verification test: PASSED (0 errors)"; \
+		else \
+			echo "  ✗ Verification test: FAILED ($$errors errors)"; \
+		fi; \
+	else \
+		echo "  ✗ Verification test: FAILED"; \
+	fi
+	@echo ""
+	@echo "=========================================="
+	@echo "✓ All tests complete!"
+	@echo "✓ All logs saved in: $(LOG_DIR)/"
+	@echo "=========================================="
 
 # ==============================================================================
 # Utility Targets
 # ==============================================================================
 
-# Clean all generated files (logs, work directories, transcripts)
+# Clean all generated files
 clean:
 	@echo "=========================================="
-	@echo "Cleaning all generated files..."
+	@echo "Cleaning generated files..."
 	@echo "=========================================="
-	@echo "→ Removing work directories..."
-	@rm -rf sim/work work
-	@echo "→ Removing log files..."
-	@rm -rf sim/logs/*.log
-	@rm -rf sim/logs/*.txt
-	@echo "→ Removing waveform files..."
-	@rm -rf sim/*.wlf sim/*.vcd
+	@rm -rf $(WORK_DIR)
 	@rm -rf *.wlf *.vcd
-	@echo "→ Removing transcript files..."
-	@rm -rf sim/transcript transcript
-	@echo "→ Removing temporary files..."
+	@rm -rf transcript
 	@rm -rf vsim.wlf vsim_stacktrace.vstf
+	@rm -rf $(LOG_DIR)/*.log 2>/dev/null || true
 	@echo ""
 	@echo "✓ Clean complete!"
 	@echo "=========================================="
 
-# Deep clean (including Python cache)
+# Deep clean (including backup)
 distclean: clean
-	@echo "→ Removing Python cache..."
+	@rm -rf Makefile.backup
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "✓ Deep clean complete!"
-
-# Show project information
-info:
-	@echo "=========================================="
-	@echo "RV32I Pipeline CPU - Project Info"
-	@echo "=========================================="
-	@echo ""
-	@echo "Architecture:     5-stage pipeline (IF→ID→EX→MEM→WB)"
-	@echo "ISA:              RV32I (37 instructions)"
-	@echo "Language:         SystemVerilog"
-	@echo "Simulator:        QuestaSim/ModelSim"
-	@echo "Automation:       Python 3 + Makefile"
-	@echo ""
-	@echo "Verification Status:"
-	@echo "  ✓ 76 instructions executed"
-	@echo "  ✓ 51/51 register writes verified (100%%)"
-	@echo "  ✓ 0 errors, 0 critical warnings"
-	@echo "  ✓ Pipeline efficiency: 89.3%%"
-	@echo "  ✓ CPI: 1.12"
-	@echo ""
-	@echo "Features:"
-	@echo "  • Data forwarding (EX→EX, MEM→EX, WB→EX)"
-	@echo "  • Hazard detection (load-use, control)"
-	@echo "  • Branch prediction (static not-taken)"
-	@echo "  • Pipeline flushing for control hazards"
-	@echo ""
-	@echo "Project Structure:"
-	@echo "  rtl/top/        - Pipeline top module"
-	@echo "  rtl/core/       - Pipeline stages & hazard units"
-	@echo "  tb/             - Testbenches"
-	@echo "  sim/            - Simulation directory"
-	@echo "  sim/scripts/    - Python automation scripts"
-	@echo "  docs/           - Documentation"
-	@echo ""
-	@echo "Documentation:"
-	@echo "  README.md                      - Project overview"
-	@echo "  docs/VERIFICATION_SUMMARY.md   - Quick verification summary"
-	@echo "  docs/VERIFICATION_REPORT.md    - Detailed verification report"
-	@echo "  docs/PERFORMANCE_ANALYSIS.md   - Performance metrics"
-	@echo ""
-	@echo "Quick Commands:"
-	@echo "  make verify     - Run full verification (recommended)"
-	@echo "  make all        - Run basic simulation"
-	@echo "  make clean      - Clean all generated files"
-	@echo ""
-	@echo "=========================================="
-
-# Check if required tools are available
-check-tools:
-	@echo "=========================================="
-	@echo "Checking Required Tools"
-	@echo "=========================================="
-	@echo ""
-	@which python3 > /dev/null && echo "✓ Python 3 found" || echo "✗ Python 3 not found"
-	@which vlog > /dev/null && echo "✓ vlog (QuestaSim/ModelSim) found" || echo "✗ vlog not found"
-	@which vsim > /dev/null && echo "✓ vsim (QuestaSim/ModelSim) found" || echo "✗ vsim not found"
-	@echo ""
-	@echo "Versions:"
-	@python3 --version 2>/dev/null || echo "Python 3 not available"
-	@vlog -version 2>/dev/null | head -1 || echo "vlog not available"
-	@echo ""
-	@echo "=========================================="
-
-# Show simulation log (last 50 lines)
-show-log:
-	@echo "=========================================="
-	@echo "Simulation Log (last 50 lines)"
-	@echo "=========================================="
-	@if [ -f sim/logs/simulation_output.log ]; then \
-		tail -50 sim/logs/simulation_output.log; \
-	else \
-		echo "No log file found. Run 'make all' first."; \
-	fi
-
-# Show verification log (last 50 lines)
-show-verify-log:
-	@echo "=========================================="
-	@echo "Verification Log (last 50 lines)"
-	@echo "=========================================="
-	@if [ -f sim/logs/full_verification.log ]; then \
-		tail -50 sim/logs/full_verification.log; \
-	else \
-		echo "No verification log found. Run 'make verify' first."; \
-	fi
-
-# Show verification summary
-summary:
-	@echo "=========================================="
-	@echo "Verification Summary"
-	@echo "=========================================="
-	@if [ -f sim/logs/full_verification.log ]; then \
-		grep -A 20 "Verification Summary" sim/logs/full_verification.log | head -25; \
-	else \
-		echo "No verification log found. Run 'make verify' first."; \
-	fi
-
-# Generate expected values (for reference)
-generate-expected:
-	@echo "Generating expected values..."
-	@cd sim/scripts && python3 generate_expected_values.py
-	@echo "✓ Expected values generated: sim/scripts/expected_values.sv"
-
-# Quick test: clean, verify, show summary
-test: clean verify summary
-	@echo ""
-	@echo "=========================================="
-	@echo "✓ Test Complete!"
-	@echo "=========================================="
-
-# ==============================================================================
-# Advanced Targets
-# ==============================================================================
-
-# Rebuild everything from scratch
-rebuild: clean all
-	@echo "✓ Rebuild complete!"
-
-# Full verification from scratch
-verify-clean: clean verify
-	@echo "✓ Clean verification complete!"
-
-# Show all logs
-logs:
-	@echo "=========================================="
-	@echo "Available Log Files"
-	@echo "=========================================="
-	@ls -lh sim/logs/*.log 2>/dev/null || echo "No log files found"
-	@echo ""
-
-# ==============================================================================
-# Documentation
-# ==============================================================================
-
-# Show README
-readme:
-	@cat README.md
-
-# Show verification summary document
-doc-verify:
-	@cat docs/VERIFICATION_SUMMARY.md
-
-# Show performance analysis
-doc-perf:
-	@cat docs/PERFORMANCE_ANALYSIS.md
 
 # ==============================================================================
 # End of Makefile

@@ -26,7 +26,9 @@
 /.vscode/
 /logs/
 /work/
-sim/transcript
+/rtl_work/
+transcript
+/thesis/
 
 # ============================================================
 # FPGA - Quartus Generated Files (Keep source, ignore build)
@@ -36,8 +38,6 @@ sim/transcript
 !fpga/*.sv
 !fpga/*.sdc
 !fpga/*.tcl
-!fpga/*.qpf
-!fpga/*.qsf
 !fpga/*.md
 
 # Ignore Quartus generated folders
@@ -51,6 +51,8 @@ fpga/greybox_tmp/
 fpga/hc_output/
 fpga/reconfig_mif/
 fpga/timing/
+fpga/*.qsf
+fpga/*.qpf
 fpga/*.rpt
 fpga/*.summary
 fpga/*.smsg
@@ -118,3 +120,5 @@ __pycache__/
 .env/
 work/
 build/
+fpga/rv32i_top.qsf
+Makefile.backup
