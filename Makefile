@@ -18,7 +18,6 @@ VLIB = vlib
 
 # Directories
 WORK_DIR = work
-SIM_DIR = sim
 LOG_DIR = logs
 
 # Compile flags
@@ -112,7 +111,11 @@ wave: compile
 	@echo "=========================================="
 	@echo "Running with GUI: $(TB)"
 	@echo "=========================================="
-	@$(SIM) -gui $(WORK_DIR).$(TB) -do "add wave -r /*; run -all"
+	@if [ "$(TB)" = "tb_rv32i_pipeline" ] && [ -f wave_$(TB).do ]; then \
+		$(SIM) -gui $(WORK_DIR).$(TB) -do wave_$(TB).do; \
+	else \
+		$(SIM) -gui $(WORK_DIR).$(TB) -do "add wave -r /*; run -all"; \
+	fi
 
 # Run all unit tests (clean output)
 unit: compile

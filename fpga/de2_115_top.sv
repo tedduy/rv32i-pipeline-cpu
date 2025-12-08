@@ -58,7 +58,7 @@ module de2_115_top (
             sw17_sync1 <= 1'b0;
             sw17_sync2 <= 1'b0;
         end else begin
-            sw17_sync1 <= SW[16];
+            sw17_sync1 <= SW[15];
             sw17_sync2 <= sw17_sync1;
         end
     end
