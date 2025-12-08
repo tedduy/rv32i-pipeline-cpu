@@ -1,22 +1,12 @@
 // =============================================================================
 // RV32I 5-Stage Pipeline CPU Top Module
 // =============================================================================
-// Pipeline Stages:
-// 1. IF  (Instruction Fetch)
-// 2. ID  (Instruction Decode)
-// 3. EX  (Execute)
-// 4. MEM (Memory Access)
-// 5. WB  (Write Back)
-//
-// Features:
-// - Data forwarding (bypassing)
-// - Hazard detection and stalling
-// - Branch/Jump flushing
+// UPDATED: Fixed synchronization for W_jal, W_jalr, W_branch_taken to WB stage
 // =============================================================================
 
 module rv32i_top #(
     parameter N = 32,
-    parameter IMEM_DEPTH = 77,
+    parameter IMEM_DEPTH = 256,
     parameter DMEM_BYTES = 256,
     parameter REG_DEPTH = 32
 )(
@@ -36,12 +26,12 @@ module rv32i_top #(
     output logic         W_reg_write,
     output logic         W_mem_write,
     output logic         W_mem_read,
-    output logic         W_branch_taken,
+    output logic         W_branch_taken, // Đã đồng bộ WB
     output logic [N-1:0] W_mem_addr,
     output logic [N-1:0] W_mem_wdata,
     output logic [N-1:0] W_mem_rdata,
-    output logic         W_jal,
-    output logic         W_jalr,
+    output logic         W_jal,          // Đã đồng bộ WB
+    output logic         W_jalr,         // Đã đồng bộ WB
     // Pipeline control signals
     output logic         W_stall,
     output logic         W_flush,
@@ -117,6 +107,7 @@ module rv32i_top #(
     logic         mem_reg_write, mem_mem_read, mem_mem_write;
     logic [1:0]   mem_wb_sel;
     logic [2:0]   mem_mem_type;
+    logic         mem_jal, mem_jalr; // <--- UPDATE: Dây nối ở tầng MEM
     // Debug: Original register values for tracking
     logic [N-1:0] mem_rd1_orig, mem_rd2_orig;
     
@@ -134,6 +125,8 @@ module rv32i_top #(
     logic [4:0]   wb_rd_addr;
     logic         wb_reg_write;
     logic [1:0]   wb_wb_sel;
+    logic         wb_jal, wb_jalr;         // <--- UPDATE: Dây nối ở tầng WB
+    logic         wb_branch_taken;         // <--- UPDATE: Dây nối ở tầng WB
     // Debug: Original register values for tracking
     logic [N-1:0] wb_rd1_orig, wb_rd2_orig;
     
@@ -154,7 +147,6 @@ module rv32i_top #(
     
     // ==========================================================================
     // Debug Output Assignments with Pipeline Tracking
-    // Track PC and instruction through pipeline for synchronized debug output
     // ==========================================================================
     
     // Pipeline tracking registers for PC
@@ -198,18 +190,21 @@ module rv32i_top #(
     assign W_RD2          = wb_rd2_orig;
     assign W_m1           = ex_alu_operand_b;
     assign W_m2           = ex_pc_branch_target;
-    assign W_ALUout       = wb_alu_result;  // WB stage ALU result
+    assign W_ALUout       = wb_alu_result;
     assign W_WB_data      = wb_data;
     assign W_rd_addr      = wb_rd_addr;
     assign W_reg_write    = wb_reg_write;
     assign W_mem_write    = mem_mem_write;
     assign W_mem_read     = mem_mem_read;
-    assign W_branch_taken = ex_branch_taken;
+    
+    // UPDATE: Đồng bộ các tín hiệu Debug từ tầng WB
+    assign W_branch_taken = wb_branch_taken; 
+    assign W_jal          = wb_jal;
+    assign W_jalr         = wb_jalr;
+    
     assign W_mem_addr     = mem_alu_result;
     assign W_mem_wdata    = mem_store_data;
     assign W_mem_rdata    = mem_load_data;
-    assign W_jal          = ex_jal;
-    assign W_jalr         = ex_jalr;
     assign W_stall        = stall_if_id;
     assign W_flush        = flush_id_ex | flush_if_id;
     assign W_immediate    = wb_immediate;
@@ -503,6 +498,13 @@ module rv32i_top #(
         .i_mem_write(ex_mem_write),
         .i_wb_sel(ex_wb_sel),
         .i_mem_type(ex_mem_type),
+        
+        // UPDATE: Nối tín hiệu JAL, JALR từ EX
+        .i_jal(ex_jal),
+        .i_jalr(ex_jalr),
+        .o_jal(mem_jal),
+        .o_jalr(mem_jalr),
+        
         .o_alu_result(mem_alu_result),
         .o_rs2_data(mem_rs2_data),
         .o_pc_branch_target(mem_pc_branch_target),
@@ -575,6 +577,16 @@ module rv32i_top #(
         .i_rd_addr(mem_rd_addr),
         .i_reg_write(mem_reg_write),
         .i_wb_sel(mem_wb_sel),
+        
+        // UPDATE: Chuyền các tín hiệu Debug qua WB
+        .i_jal(mem_jal),
+        .i_jalr(mem_jalr),
+        .i_branch_taken(mem_branch_taken),
+        
+        .o_jal(wb_jal),
+        .o_jalr(wb_jalr),
+        .o_branch_taken(wb_branch_taken),
+        
         .o_alu_result(wb_alu_result),
         .o_mem_read_data(wb_mem_read_data),
         .o_return_addr(wb_return_addr),
