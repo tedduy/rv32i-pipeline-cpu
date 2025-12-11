@@ -26,11 +26,14 @@
 /.vscode/
 /logs/
 /work/
+/work_gl/
 /rtl_work/
 transcript
 /thesis/
 *.md.backup
-
+*.vcd
+*.vstf
+wlftDHkmz7
 # ============================================================
 # FPGA - Quartus Generated Files (Keep source, ignore build)
 # ============================================================

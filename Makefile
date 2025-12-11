@@ -2,7 +2,7 @@
 # Makefile for RV32I Pipeline CPU - QuestaSim
 # ==============================================================================
 
-.PHONY: help all clean compile run unit pipeline verify
+.PHONY: help all clean compile run unit pipeline verify gl gl-compile gl-clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -18,16 +18,28 @@ VLIB = vlib
 
 # Directories
 WORK_DIR = work
+WORK_GL_DIR = work_gl
 LOG_DIR = logs
 
 # Compile flags
 VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
+VLOG_GL_FLAGS = +acc -work $(WORK_GL_DIR)
 
 # Simulation flags
 VSIM_FLAGS = -c -work $(WORK_DIR)
+VSIM_GL_FLAGS = -c -suppress 12110 -work $(WORK_GL_DIR)
 
 # File lists
 COMPILE_LIST = compile.f
+
+# Gate-level paths
+RUN_DIR = openlane
+GL_NETLIST = $(RUN_DIR)/rv32i_top.v
+GL_SDF = $(RUN_DIR)/rv32i_top.sdf
+PDK_ROOT = /home/buuduy/.ciel/ciel/sky130/versions/0fe599b2afb6708d281543108caf8310912f54af
+SKY130_PRIMITIVES = $(PDK_ROOT)/sky130B/libs.ref/sky130_fd_sc_hd/verilog/primitives.v
+SKY130_LIB = $(PDK_ROOT)/sky130B/libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v
+TB_GL = tb/tb_rv32i_gl.sv
 
 # Unit test list
 UNIT_TESTS = tb_alu_unit tb_reg_file tb_imm_gen tb_branch_unit \
@@ -43,21 +55,28 @@ help:
 	@echo "RV32I Pipeline CPU - Makefile"
 	@echo "=========================================="
 	@echo ""
-	@echo "Main Commands:"
+	@echo "RTL Simulation Commands:"
 	@echo "  make compile          - Compile all RTL and testbench"
 	@echo "  make run TB=<name>    - Run specific testbench"
 	@echo "  make wave TB=<name>   - Run with waveform viewer (GUI)"
 	@echo "  make unit             - Run all unit tests (10 tests)"
 	@echo "  make pipeline         - Run pipeline integration test"
-	@echo "  make verify           - Run full verification test"
+	@echo "  make verify           - Run Write back data test (Optinal)"
 	@echo "  make all              - Compile + run all tests"
-	@echo "  make clean            - Clean generated files"
+	@echo ""
+	@echo "Gate-Level Simulation Commands:"
+	@echo "  make gl               - Run gate-level simulation"
+	@echo "  make wave TB=tb_rv32i_gl - Run gate-level with GUI"
+	@echo ""
+	@echo "Utility Commands:"
+	@echo "  make clean            - Clean all generated files"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run TB=tb_alu_unit           - Test ALU only"
 	@echo "  make wave TB=tb_alu_unit          - View ALU waveform"
 	@echo "  make run TB=tb_rv32i_pipeline     - Test pipeline"
 	@echo "  make unit                         - Test all 10 units"
+	@echo "  make gl                           - Run gate-level sim"
 	@echo ""
 	@echo "Unit Tests Available:"
 	@echo "  tb_alu_unit, tb_reg_file, tb_imm_gen, tb_branch_unit"
@@ -65,7 +84,10 @@ help:
 	@echo "  tb_instruction_mem, tb_data_memory"
 	@echo ""
 	@echo "Integration Tests:"
-	@echo "  tb_rv32i_pipeline, tb_full_verification"
+	@echo "  tb_rv32i_pipeline"
+	@echo ""
+	@echo "Gate-Level:"
+	@echo "  Run 3 (Best Config) - 0.81mm², 50MHz, 0 DRC violations"
 	@echo ""
 	@echo "=========================================="
 
@@ -73,7 +95,7 @@ help:
 # Main Targets
 # ==============================================================================
 
-# Compile all RTL and testbench
+# Compile all RTL and testbench (including gate-level)
 compile:
 	@echo "=========================================="
 	@echo "Compiling RTL and Testbench..."
@@ -81,7 +103,20 @@ compile:
 	@if [ ! -d $(WORK_DIR) ]; then $(VLIB) $(WORK_DIR); fi
 	@$(VLOG) $(VLOG_FLAGS) -f $(COMPILE_LIST)
 	@echo ""
-	@echo "✓ Compilation complete!"
+	@echo "✓ RTL Compilation complete!"
+	@echo ""
+	@echo "Compiling Gate-Level Netlist (Run 3)..."
+	@if [ ! -d $(WORK_GL_DIR) ]; then $(VLIB) $(WORK_GL_DIR); fi
+	@echo "[1/3] Compiling Sky130 PDK..."
+	@$(VLOG) $(VLOG_GL_FLAGS) -suppress 2892 +define+USE_POWER_PINS \
+		"$(SKY130_PRIMITIVES)" \
+		"$(SKY130_LIB)" > /dev/null 2>&1 || (echo "Error compiling Sky130 PDK"; exit 1)
+	@echo "[2/3] Compiling Gate-Level Netlist..."
+	@$(VLOG) $(VLOG_GL_FLAGS) -suppress 2892 +define+USE_POWER_PINS \
+		"$(GL_NETLIST)" > /dev/null 2>&1 || (echo "Error compiling gate-level netlist"; exit 1)
+	@echo "[3/3] Compiling Testbench..."
+	@$(VLOG) $(VLOG_GL_FLAGS) "$(TB_GL)" > /dev/null 2>&1 || (echo "Error compiling testbench"; exit 1)
+	@echo "✓ Gate-level compilation complete!"
 	@echo "=========================================="
 
 # Run specific testbench
@@ -102,15 +137,20 @@ run: compile
 	@echo "=========================================="
 
 # Run with waveform viewer
-wave: compile
+wave:
 	@if [ -z "$(TB)" ]; then \
 		echo "Error: Please specify TB=<testbench_name>"; \
 		echo "Example: make wave TB=tb_alu_unit"; \
+		echo "Example: make wave TB=tb_rv32i_gl (for gate-level)"; \
 		exit 1; \
 	fi
 	@echo "=========================================="
 	@echo "Running with GUI: $(TB)"
 	@echo "=========================================="
+	@if [ ! -d $(WORK_DIR) ]; then \
+		echo "Compiling first..."; \
+		$(MAKE) compile; \
+	fi
 	@if [ "$(TB)" = "tb_rv32i_pipeline" ] && [ -f wave_$(TB).do ]; then \
 		$(SIM) -gui $(WORK_DIR).$(TB) -do wave_$(TB).do; \
 	else \
@@ -243,15 +283,49 @@ all: compile
 	@echo "=========================================="
 
 # ==============================================================================
+# Gate-Level Simulation Targets
+# ==============================================================================
+
+# Run gate-level simulation (command-line)
+gl:
+	@if [ ! -d $(WORK_GL_DIR) ]; then \
+		echo "Work directory not found. Running compile first..."; \
+		$(MAKE) compile; \
+	fi
+	@mkdir -p $(LOG_DIR)
+	@echo ""
+	@echo "=========================================="
+	@echo "Running Gate-Level Simulation"
+	@echo "Run 3: 0.81mm², 50MHz, 50.95% util"
+	@echo "=========================================="
+	@$(SIM) $(VSIM_GL_FLAGS) $(WORK_GL_DIR).tb_rv32i_gl \
+		-do "run -all; quit -f" > $(LOG_DIR)/gl_simulation.log 2>&1
+	@echo ""
+	@if grep -q "ALL.*TESTS PASSED" $(LOG_DIR)/gl_simulation.log; then \
+		passed=$$(grep "PASSED:" $(LOG_DIR)/gl_simulation.log | tail -1 | sed 's/.*PASSED: *\([0-9]*\).*/\1/'); \
+		total=$$(grep "Instructions:" $(LOG_DIR)/gl_simulation.log | sed 's/.*Instructions: *\([0-9]*\).*/\1/'); \
+		cycles=$$(grep "Total Cycles:" $(LOG_DIR)/gl_simulation.log | sed 's/.*Total Cycles: *\([0-9]*\).*/\1/'); \
+		echo "✓ Gate-Level Simulation: PASSED ($$passed tests)"; \
+		echo "  Total Instructions: $$total"; \
+		echo "  Total Cycles: $$cycles"; \
+	else \
+		echo "✗ Gate-Level Simulation: FAILED"; \
+		echo "  Check log for details: $(LOG_DIR)/gl_simulation.log"; \
+	fi
+	@echo ""
+	@echo "✓ Full log saved: $(LOG_DIR)/gl_simulation.log"
+	@echo "=========================================="
+
+# ==============================================================================
 # Utility Targets
 # ==============================================================================
 
 # Clean all generated files
 clean:
 	@echo "=========================================="
-	@echo "Cleaning generated files..."
+	@echo "Cleaning all generated files..."
 	@echo "=========================================="
-	@rm -rf $(WORK_DIR)
+	@rm -rf $(WORK_DIR) $(WORK_GL_DIR)
 	@rm -rf *.wlf *.vcd
 	@rm -rf transcript
 	@rm -rf vsim.wlf vsim_stacktrace.vstf

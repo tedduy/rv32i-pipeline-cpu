@@ -45,7 +45,8 @@ Bộ vi xử lý **RISC-V 32-bit (RV32I)** theo kiến trúc **5-stage pipeline*
 
 ```
 rv32i-pipeline-cpu/
-├── rtl/                    # Mã nguồn RTL
+├── fpga/                    # FPGA Set Up
+├── rtl/                    # RTL Source Code
 │   ├── top/                # rv32i_top.sv
 │   ├── core/
 │   │   ├── stages/         # ALU, Control, RegFile, Memory...
@@ -54,13 +55,13 @@ rv32i-pipeline-cpu/
 │   └── common/             # Adder, Mux
 ├── tb/                     # Testbenches
 │   ├── unit_test/          # 10 unit tests
-│   └── tb_full_verification.sv  # Test chính (51 cases)
-├── fpga/                   # FPGA DE2-115
-│   ├── de2_115_top.sv
-│   └── de2_115_pins.tcl
-├── docs/                   # Tài liệu
-├── thesis/                 # Luận văn LaTeX
-└── Makefile
+│   └── tb_rv32i_gl.sv            # Gate-level testbench
+│   └── tb_rv32i_pipeline.sv      # System testbench
+├── openlane/               # OpenLane ASIC Synthesis
+│   ├── rv32i_top.v         # Gate-level netlist
+│   └── rv32i_top.sdf       # Timing annotation
+├── docs/                   # Documentation
+└── Makefile                # Build automation
 ```
 
 ---
@@ -72,40 +73,33 @@ rv32i-pipeline-cpu/
 - Intel Quartus Prime (cho FPGA)
 - Make, Bash
 
-### Chạy Simulation
+### Quick Start
 
 ```bash
-# Clone dự án
-git clone <repo-url>
+# Clone project
+git clone https://github.com/tedduy/rv32i-pipeline-cpu
 cd rv32i-pipeline-cpu
 
-# Chạy Full Verification (quan trọng nhất)
-make verify
+# Compile all (RTL + Gate-level)
+make compile
 
-# Chạy Unit Tests (10 tests)
+# Run RTL simulation
+make pipeline
+
+# Run unit tests
 make unit
 
-# Chạy test cụ thể
-make run TB=tb_alu_unit
+# Run gate-level simulation
+make gl
 
-# Xem waveform
-make wave TB=tb_full_verification
+# View waveform
+make wave TB=tb_rv32i_pipeline
 
-# Xem tất cả lệnh
-make help
-
-# Dọn dẹp
+# Clean
 make clean
-```
 
-### FPGA Implementation
-
-Chi tiết xem: [`fpga/README.md`](fpga/README.md)
-
-```bash
-# Mở Quartus Prime → Open Project: fpga/rv32i_top.qpf
-# Processing → Start Compilation
-# Tools → Programmer → Program FPGA
+# Help
+make help
 ```
 
 ---
@@ -137,16 +131,33 @@ Chi tiết: [`docs/VERIFICATION_REPORT.md`](docs/VERIFICATION_REPORT.md)
 
 ---
 
-## Tài liệu
+## Gate-Level Simulation
 
-- [`docs/VERIFICATION_REPORT.md`](docs/VERIFICATION_REPORT.md) - Báo cáo kiểm chứng
-- [`docs/PERFORMANCE_ANALYSIS.md`](docs/PERFORMANCE_ANALYSIS.md) - Phân tích hiệu năng
-- [`fpga/README.md`](fpga/README.md) - Hướng dẫn FPGA
-- [`thesis/README.md`](thesis/README.md) - Biên dịch luận văn
+```bash
+# Compile RTL + Gate-level netlist
+make compile
+
+# Run gate-level simulation
+make gl
+
+# View detailed log
+cat logs/gl_simulation.log
+```
+
+**Gate-Level Results:**
+- ✅ 76/76 tests PASSED
+- ✅ Synthesized with OpenLane (Sky130 PDK)
+- ✅ Area: 0.81 mm², Frequency: 50 MHz
+- ✅ Timing verified with SDF annotation
+
+---
+
+## Documentation
 
 **RISC-V References:**
 - [RISC-V ISA Specification](https://riscv.org/technical/specifications/)
-- RV32I Base Integer v2.2
+- [RISC-V User Manual](https://five-embeddev.com/riscv-user-isa-manual/)
+- [OpenLane Documentation](https://openlane.readthedocs.io/)
 
 ---
 

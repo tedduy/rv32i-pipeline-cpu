@@ -37,3 +37,13 @@ tb/unit_test/tb_control_unit.sv
 tb/unit_test/tb_program_counter.sv
 tb/unit_test/tb_instruction_mem.sv
 tb/unit_test/tb_data_memory.sv
+# ==============================================================================
+# Gate-Level Simulation Files
+# For OpenLane Run 3 (Best Configuration) + Sky130 PDK
+# ==============================================================================
+
+# Note: These files are used by 'make gl' targets only
+# Sky130 PDK Libraries and Gate-Level Netlist paths are defined in Makefile
+
+# Gate-Level Testbench
+tb/tb_rv32i_gl.sv
