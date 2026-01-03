@@ -252,7 +252,7 @@ module tb_rv32i_pipeline #(
     
     // Cycle counter and hazard tracking
     always @(posedge clk) begin
-        if (!rst) begin
+        if (!rst && !finish_req) begin
             cycle_count++;
             if (W_stall) stall_count++;
             if (W_flush) flush_count++;
@@ -330,8 +330,8 @@ module tb_rv32i_pipeline #(
             if (W_PC_out != prev_pc) begin
                 prev_pc = W_PC_out;
                 
-                // Stop at end of instruction memory (PC = 0x12C = 76*4)
-                if (W_PC_out >= 32'h12C) begin
+                // Stop after 76 instructions executed (match report)
+                if (instruction_count >= 76) begin
                     finish_req = 1;
                     // Wait for pipeline to drain
                     repeat(7) @(posedge clk);
