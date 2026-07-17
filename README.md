@@ -141,6 +141,31 @@ Hai file list được dùng là:
 - [`filelist.f`](filelist.f) — RTL và testbench.
 - [`filelist_netlist.f`](filelist_netlist.f) — Sky130 netlist và gate-level testbench.
 
+## Architectural compliance (ACT4)
+
+Thư mục [`compliance/act4/`](compliance/act4/) chứa cấu hình cho flow ACT4 chính
+thức. Profile hiện tại chỉ bật extension `I`; `Zicsr` và machine-mode chưa được
+khai báo compliance cho đến khi core có đủ các CSR bắt buộc như `misa` và nhóm
+machine identification CSR.
+
+Sau khi cài dependencies của ACT4 và checkout branch `act4` của
+`riscv-arch-test`:
+
+```bash
+# Sinh các self-checking ELF chính thức
+make act-generate ACT_ROOT=/path/to/riscv-arch-test
+
+# Chạy một ELF
+make act-run ELF=/path/to/test.elf
+
+# Chạy toàn bộ ELF trong một thư mục
+make act-regression ACT_ELF_DIR=/path/to/elfs
+```
+
+`tb/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
+`0x1000_0000` và thanh ghi pass/fail tại `0x2000_0000`. Script Python đọc trực
+tiếp các segment ELF32 little-endian nên bước chạy DUT không phụ thuộc `objcopy`.
+
 ## FPGA
 
 Wrapper và Quartus project DE2-115 nằm tại [`fpga/de2_115/`](fpga/de2_115/).

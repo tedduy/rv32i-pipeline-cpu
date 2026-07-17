@@ -3,7 +3,8 @@
 # ==============================================================================
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
-	vcs vcs-compile vcs-run vcs-gui verdi distclean
+	vcs vcs-compile vcs-run vcs-gui verdi act-generate act-compile act-run \
+	act-regression distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -24,6 +25,9 @@ WORK_DIR = work
 WORK_GL_DIR = work_gl
 LOG_DIR = logs
 VCS_BUILD_ROOT = build/vcs
+ACT_CONFIG = compliance/act4/test_config.yaml
+ACT_WORK_DIR = build/act4
+ACT_MAX_CYCLES ?= 1000000
 
 # Compile flags
 VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
@@ -83,6 +87,11 @@ help:
 	@echo "  make vcs-gui TB=<name>     - Run the VCS executable in Verdi GUI mode"
 	@echo "  make verdi TB=<name>       - Open the compiled VCS design in Verdi"
 	@echo "  Default TB: tb_rv32i_pipeline"
+	@echo ""
+	@echo "RISC-V ACT4 Compliance Commands:"
+	@echo "  make act-generate ACT_ROOT=/path/to/riscv-arch-test"
+	@echo "  make act-run ELF=/path/to/test.elf"
+	@echo "  make act-regression ACT_ELF_DIR=/path/to/elfs"
 	@echo ""
 	@echo "Gate-Level Simulation Commands:"
 	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
@@ -167,6 +176,35 @@ vcs-gui: vcs-compile
 verdi: vcs-compile
 	@command -v $(VERDI) >/dev/null 2>&1 || { echo "Error: Verdi executable '$(VERDI)' not found"; exit 1; }
 	@$(VERDI) -dbdir $(VCS_SIMV).daidir -top $(VCS_TOP)
+
+# Generate official ACT4 self-checking ELFs using a local checkout of the
+# riscv-arch-test ACT4 branch and this core's configuration.
+act-generate:
+	@if [ -z "$(ACT_ROOT)" ]; then \
+		echo "Error: set ACT_ROOT to the riscv-arch-test ACT4 checkout"; \
+		exit 1; \
+	fi
+	@$(MAKE) -C "$(ACT_ROOT)" CONFIG_FILES="$(abspath $(ACT_CONFIG))"
+
+# Compile the unified-memory ACT4 harness once; it can run every generated ELF.
+act-compile: TB=tb_act
+act-compile: vcs-compile
+
+act-run: act-compile
+	@if [ -z "$(ELF)" ]; then \
+		echo "Error: specify ELF=/path/to/act4-test.elf"; \
+		exit 1; \
+	fi
+	@python3 scripts/run_act.py "$(ELF)" --simv "$(VCS_BUILD_ROOT)/tb_act/simv" \
+		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
+
+act-regression: act-compile
+	@if [ -z "$(ACT_ELF_DIR)" ]; then \
+		echo "Error: specify ACT_ELF_DIR=/path/to/act4/elfs"; \
+		exit 1; \
+	fi
+	@python3 scripts/run_act.py "$(ACT_ELF_DIR)" --simv "$(VCS_BUILD_ROOT)/tb_act/simv" \
+		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
 
 # Compile the generated Sky130 netlist independently from RTL.
 gl-compile:

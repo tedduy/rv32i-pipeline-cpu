@@ -8,6 +8,7 @@
 +incdir+rtl/hazard
 +incdir+tb/unit
 +incdir+tb/integration
++incdir+tb/compliance
 
 rtl/common/adder_n_bit.sv
 rtl/common/mux2to1.sv
@@ -49,6 +50,7 @@ tb/integration/tb_commit_interface.sv
 tb/integration/tb_machine_csr_trap.sv
 tb/integration/tb_machine_external_interrupt.sv
 tb/integration/tb_machine_exceptions.sv
+tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv
 tb/unit/tb_register_file.sv

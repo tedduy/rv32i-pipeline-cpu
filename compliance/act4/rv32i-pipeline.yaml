@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/riscv/riscv-unified-db/main/spec/schemas/config_schema.json
+---
+$schema: config_schema.json#
+kind: architecture configuration
+type: fully configured
+name: rv32i-pipeline
+description: Base RV32I compliance profile for the rv32i-pipeline CPU
+
+# Start with the architectural surface that is complete and independently
+# testable. Zicsr/Sm are intentionally deferred until mandatory machine CSRs
+# such as misa and the read-only identification CSRs are implemented.
+implemented_extensions:
+  - { name: I, version: "= 2.1" }
+
+params:
+  MXLEN: 32
