@@ -39,6 +39,7 @@ rtl/rv32i_top.sv
 
 tb/integration/tb_full_verification.sv
 tb/integration/tb_rv32i_pipeline.sv
+tb/integration/tb_load_use_hazard.sv
 
 tb/unit/tb_alu_unit.sv
 tb/unit/tb_register_file.sv

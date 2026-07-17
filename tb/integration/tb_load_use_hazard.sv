@@ -1,0 +1,74 @@
+`timescale 1ns/1ps
+
+// Directed integration test for a load-use dependency:
+//   sw   x2, 0(x0)      // memory[0] = 32
+//   lw   x3, 0(x0)      // x3 = 32
+//   add  x6, x3, x1     // immediately consumes x3; must stall once
+//   addi x7, x6, 1      // also checks forwarding after the stall
+module tb_load_use_hazard;
+
+    logic        clk;
+    logic        arst_n;
+    logic [31:0] imem_addr;
+    logic [31:0] imem_rdata;
+    logic        stall;
+    integer      stall_cycles;
+
+    rv32i_top dut (
+        .i_clk         (clk),
+        .i_arst_n      (arst_n),
+        .o_imem_addr   (imem_addr),
+        .i_imem_rdata  (imem_rdata),
+        .W_stall       (stall)
+    );
+
+    // Zero-wait-state instruction memory model outside the CPU core.
+    always_comb begin
+        unique case (imem_addr)
+            32'h0000_0000: imem_rdata = 32'h0020_2023; // sw   x2, 0(x0)
+            32'h0000_0004: imem_rdata = 32'h0000_2183; // lw   x3, 0(x0)
+            32'h0000_0008: imem_rdata = 32'h0011_8333; // add  x6, x3, x1
+            32'h0000_000c: imem_rdata = 32'h0013_0393; // addi x7, x6, 1
+            default:       imem_rdata = 32'h0000_0013; // nop
+        endcase
+    end
+
+    initial begin
+        clk = 1'b0;
+        forever #5 clk = ~clk;
+    end
+
+    always @(posedge clk) begin
+        if (!arst_n)
+            stall_cycles <= 0;
+        else if (stall)
+            stall_cycles <= stall_cycles + 1;
+    end
+
+    initial begin
+        arst_n = 1'b0;
+        stall_cycles = 0;
+        repeat (3) @(posedge clk);
+        arst_n = 1'b1;
+
+        repeat (20) @(posedge clk);
+        #1;
+
+        if (stall_cycles != 1)
+            $fatal(1, "Expected exactly 1 load-use stall, observed %0d", stall_cycles);
+
+        if (dut.id_regfile.regs[3] !== 32'd32)
+            $fatal(1, "LW failed: x3=%08h, expected 00000020", dut.id_regfile.regs[3]);
+
+        if (dut.id_regfile.regs[6] !== 32'd48)
+            $fatal(1, "Load-use result failed: x6=%08h, expected 00000030", dut.id_regfile.regs[6]);
+
+        if (dut.id_regfile.regs[7] !== 32'd49)
+            $fatal(1, "Post-stall forwarding failed: x7=%08h, expected 00000031", dut.id_regfile.regs[7]);
+
+        $display("*** LOAD-USE HAZARD TEST PASSED ***");
+        $display("Observed stall cycles: %0d", stall_cycles);
+        $finish;
+    end
+
+endmodule
