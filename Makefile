@@ -111,6 +111,7 @@ help:
 	@echo "  tb_memory_wait_states"
 	@echo "  tb_reset_vector, tb_commit_interface, tb_machine_csr_trap"
 	@echo "  tb_machine_external_interrupt"
+	@echo "  tb_machine_exceptions"
 	@echo ""
 	@echo "Gate-Level:"
 	@echo "  Run 3 (Best Config) - 0.81mm², 50MHz, 0 DRC violations"

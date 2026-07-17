@@ -24,6 +24,7 @@ module tb_control_unit;
   logic        Ecall;
   logic        Ebreak;
   logic        Mret;
+  logic        Illegal;
 
   // Instantiate DUT
   control_unit dut (
@@ -47,7 +48,8 @@ module tb_control_unit;
     .o_CsrImm(CsrImm),
     .o_Ecall(Ecall),
     .o_Ebreak(Ebreak),
-    .o_Mret(Mret)
+    .o_Mret(Mret),
+    .o_Illegal(Illegal)
   );
 
   // Test counter
@@ -194,6 +196,16 @@ module tb_control_unit;
       pass_count++;
     end else begin
       $display("[FAIL] MRET decode");
+    end
+
+    instruction = 32'hffff_ffff;
+    #1;
+    test_count++;
+    if (Illegal && !RegWrite && !MemRead && !MemWrite) begin
+      $display("[PASS] Illegal instruction");
+      pass_count++;
+    end else begin
+      $display("[FAIL] Illegal instruction decode");
     end
 
     // Summary

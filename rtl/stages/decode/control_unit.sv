@@ -31,7 +31,8 @@ module control_unit (
   output logic        o_CsrImm,
   output logic        o_Ecall,
   output logic        o_Ebreak,
-  output logic        o_Mret
+  output logic        o_Mret,
+  output logic        o_Illegal
 );
 
   // Extract instruction fields
@@ -56,6 +57,7 @@ module control_unit (
     OP_STORE  = 7'b0100011,  // SB, SH, SW (3)
     OP_IMM    = 7'b0010011,  // ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI (9)
     OP_REG    = 7'b0110011,  // ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND (10)
+    OP_MISC_MEM = 7'b0001111, // FENCE (strongly ordered core: architectural NOP)
     OP_SYSTEM = 7'b1110011;  // ECALL, EBREAK, MRET and Zicsr
 
   // ==========================================================================
@@ -96,6 +98,64 @@ module control_unit (
     PC_BRANCH = 2'b01,  // Branch target (if branch taken)
     PC_JAL    = 2'b10,  // JAL target (PC + J-imm)
     PC_JALR   = 2'b11;  // JALR target ((rs1 + I-imm) & ~1)
+
+  function automatic logic instruction_is_legal(input logic [31:0] inst);
+    logic [6:0] op;
+    logic [2:0] f3;
+    logic [6:0] f7;
+    begin
+      op = inst[6:0];
+      f3 = inst[14:12];
+      f7 = inst[31:25];
+      instruction_is_legal = 1'b0;
+
+      case (op)
+        OP_LUI, OP_AUIPC, OP_JAL: instruction_is_legal = 1'b1;
+        OP_JALR: instruction_is_legal = (f3 == 3'b000);
+        OP_BRANCH: instruction_is_legal = (f3 == 3'b000) || (f3 == 3'b001) ||
+                                                  (f3 == 3'b100) || (f3 == 3'b101) ||
+                                                  (f3 == 3'b110) || (f3 == 3'b111);
+        OP_LOAD: instruction_is_legal = (f3 == 3'b000) || (f3 == 3'b001) ||
+                                                (f3 == 3'b010) || (f3 == 3'b100) ||
+                                                (f3 == 3'b101);
+        OP_STORE: instruction_is_legal = (f3 == 3'b000) || (f3 == 3'b001) ||
+                                                 (f3 == 3'b010);
+        OP_IMM: begin
+          case (f3)
+            3'b000, 3'b010, 3'b011, 3'b100, 3'b110, 3'b111:
+              instruction_is_legal = 1'b1;
+            3'b001: instruction_is_legal = (f7 == 7'b0000000);
+            3'b101: instruction_is_legal = (f7 == 7'b0000000) ||
+                                                    (f7 == 7'b0100000);
+            default: instruction_is_legal = 1'b0;
+          endcase
+        end
+        OP_REG: begin
+          case (f3)
+            3'b000, 3'b101: instruction_is_legal = (f7 == 7'b0000000) ||
+                                                    (f7 == 7'b0100000);
+            3'b001, 3'b010, 3'b011, 3'b100, 3'b110, 3'b111:
+              instruction_is_legal = (f7 == 7'b0000000);
+            default: instruction_is_legal = 1'b0;
+          endcase
+        end
+        OP_MISC_MEM: instruction_is_legal = (f3 == 3'b000);
+        OP_SYSTEM: begin
+          if (f3 == 3'b000)
+            instruction_is_legal = (inst == 32'h0000_0073) ||
+                                   (inst == 32'h0010_0073) ||
+                                   (inst == 32'h3020_0073);
+          else
+            instruction_is_legal = (f3 == 3'b001) || (f3 == 3'b010) ||
+                                   (f3 == 3'b011) || (f3 == 3'b101) ||
+                                   (f3 == 3'b110) || (f3 == 3'b111);
+        end
+        default: instruction_is_legal = 1'b0;
+      endcase
+    end
+  endfunction
+
+  assign o_Illegal = !instruction_is_legal(i_instruction);
 
   // ==========================================================================
   // Main Control Logic - 37 Instructions
@@ -268,6 +328,11 @@ module control_unit (
           3'b111: o_ALUCtrl = ALU_AND;   // AND
           default: o_ALUCtrl = ALU_ADD;
         endcase
+      end
+
+      OP_MISC_MEM: begin
+        // This in-order core allows only one outstanding memory transaction,
+        // so FENCE requires no additional datapath action.
       end
 
       // ======================================================================

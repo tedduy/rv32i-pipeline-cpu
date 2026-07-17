@@ -15,6 +15,10 @@ machine mode. Các CSR hiện có gồm `mstatus`, `mie`, `mtvec`, `mscratch`, `
 `mcause`, `mtval`, `mip`, `mcycle` và `minstret`. Ba ngõ vào interrupt đồng bộ
 với clock hỗ trợ machine software, timer và external interrupt.
 
+Illegal instruction, truy cập CSR không được hỗ trợ, địa chỉ load/store lệch
+alignment và target branch/jump lệch `IALIGN=32` đều tạo precise exception trước
+khi instruction gây lỗi tạo side effect.
+
 ## Commit/retire interface
 
 Khi một instruction hoàn tất theo đúng thứ tự chương trình, core phát một xung
@@ -105,6 +109,9 @@ make vcs TB=tb_machine_csr_trap
 
 # Kiểm tra machine external interrupt
 make vcs TB=tb_machine_external_interrupt
+
+# Kiểm tra illegal instruction và misaligned access
+make vcs TB=tb_machine_exceptions
 
 # Mở waveform của pipeline
 make wave TB=tb_rv32i_pipeline

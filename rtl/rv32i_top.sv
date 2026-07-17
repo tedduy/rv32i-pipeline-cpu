@@ -103,7 +103,7 @@ module rv32i_top #(
     logic        id_jal, id_jalr;
     logic        id_csr_en, id_csr_imm;
     logic [1:0]  id_csr_op;
-    logic        id_ecall, id_ebreak, id_mret;
+    logic        id_ecall, id_ebreak, id_mret, id_illegal;
     
     // ==========================================================================
     // ID/EX Pipeline Register Signals
@@ -121,7 +121,7 @@ module rv32i_top #(
     logic         ex_jal, ex_jalr;
     logic         ex_csr_en, ex_csr_imm;
     logic [1:0]   ex_csr_op;
-    logic         ex_ecall, ex_ebreak, ex_mret;
+    logic         ex_ecall, ex_ebreak, ex_mret, ex_illegal;
     // Debug: Original register values for tracking
     logic [N-1:0] ex_rd1_orig, ex_rd2_orig;
     
@@ -142,11 +142,17 @@ module rv32i_top #(
     logic [11:0]  ex_csr_addr;
     logic [N-1:0] ex_csr_rdata, ex_csr_operand, ex_csr_wdata;
     logic [N-1:0] csr_mtvec, csr_mepc;
-    logic         csr_write;
+    logic         csr_write, csr_write_intent;
+    logic         csr_valid, csr_writable, csr_access_illegal;
     logic         sync_trap, irq_take, trap_enter, mret_taken, system_redirect;
     logic         csr_irq_pending;
-    logic [N-1:0] csr_irq_cause, trap_cause;
+    logic [N-1:0] csr_irq_cause, trap_cause, trap_value;
     logic [N-1:0] system_redirect_pc;
+    logic [N-1:0] control_transfer_target;
+    logic         instruction_addr_misaligned;
+    logic         data_addr_misaligned;
+    logic         illegal_exception, load_misaligned_exception;
+    logic         store_misaligned_exception;
     
     // ==========================================================================
     // EX/MEM Pipeline Register Signals
@@ -332,7 +338,8 @@ module rv32i_top #(
     ) if_pc_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_PC((stall_pc || memory_stall) ? if_pc_current : if_pc_next),
+        .i_PC((memory_stall || (stall_pc && !system_redirect)) ?
+              if_pc_current : if_pc_next),
         .o_PC(if_pc_current)
     );
     
@@ -401,7 +408,8 @@ module rv32i_top #(
         .o_CsrImm(id_csr_imm),
         .o_Ecall(id_ecall),
         .o_Ebreak(id_ebreak),
-        .o_Mret(id_mret)
+        .o_Mret(id_mret),
+        .o_Illegal(id_illegal)
     );
     
     // Register File (write happens in WB stage)
@@ -485,6 +493,7 @@ module rv32i_top #(
         .i_ecall(id_ecall),
         .i_ebreak(id_ebreak),
         .i_mret(id_mret),
+        .i_illegal(id_illegal),
         .o_valid(ex_valid),
         .o_pc(ex_pc),
         .o_instruction(ex_instruction),
@@ -512,7 +521,8 @@ module rv32i_top #(
         .o_csr_imm(ex_csr_imm),
         .o_ecall(ex_ecall),
         .o_ebreak(ex_ebreak),
-        .o_mret(ex_mret)
+        .o_mret(ex_mret),
+        .o_illegal(ex_illegal)
     );
     
     // Track original RD1/RD2 values through EX stage
@@ -623,32 +633,77 @@ module rv32i_top #(
         endcase
     end
 
-    assign csr_write = ex_valid && ex_csr_en && !memory_stall &&
-                       ((ex_csr_op == 2'b00) || (ex_rs1_addr != 5'd0));
+    assign csr_write_intent = ex_csr_en &&
+                              ((ex_csr_op == 2'b00) || (ex_rs1_addr != 5'd0));
+    assign csr_access_illegal = ex_valid && ex_csr_en &&
+                                (!csr_valid || (csr_write_intent && !csr_writable));
+    assign csr_write = ex_valid && csr_write_intent && csr_valid && csr_writable &&
+                       !memory_stall;
     assign ex_result = ex_csr_en ? ex_csr_rdata : ex_alu_result;
 
-    assign sync_trap = ex_valid && (ex_ecall || ex_ebreak) && !memory_stall;
+    assign control_transfer_target = ex_branch_taken ? ex_pc_branch_target
+                                                      : ex_jump_target;
+    assign instruction_addr_misaligned = ex_valid &&
+                                          (ex_branch_taken || ex_jal || ex_jalr) &&
+                                          (control_transfer_target[1:0] != 2'b00);
+
+    always_comb begin
+        unique case (ex_mem_type)
+            3'b001, 3'b101: data_addr_misaligned = ex_alu_result[0];
+            3'b010:         data_addr_misaligned = |ex_alu_result[1:0];
+            default:        data_addr_misaligned = 1'b0;
+        endcase
+    end
+
+    assign illegal_exception = ex_valid && (ex_illegal || csr_access_illegal);
+    assign load_misaligned_exception = ex_valid && ex_mem_read && data_addr_misaligned;
+    assign store_misaligned_exception = ex_valid && ex_mem_write && data_addr_misaligned;
+    assign sync_trap = !memory_stall &&
+                       (illegal_exception || instruction_addr_misaligned ||
+                        (ex_valid && ex_ebreak) || load_misaligned_exception ||
+                        store_misaligned_exception || (ex_valid && ex_ecall));
     assign irq_take = ex_valid && csr_irq_pending && !sync_trap && !memory_stall;
     assign trap_enter = sync_trap || irq_take;
     assign mret_taken = ex_valid && ex_mret && !memory_stall;
     assign system_redirect = trap_enter || mret_taken;
     assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00}
                                            : {csr_mepc[N-1:2], 2'b00};
-    assign trap_cause = irq_take ? csr_irq_cause
-                                 : (ex_ebreak ? {{(N-2){1'b0}}, 2'd3}
-                                               : {{(N-4){1'b0}}, 4'd11});
+
+    always_comb begin
+        trap_cause = {{(N-4){1'b0}}, 4'd11};
+        trap_value = '0;
+        if (irq_take) begin
+            trap_cause = csr_irq_cause;
+        end else if (illegal_exception) begin
+            trap_cause = {{(N-2){1'b0}}, 2'd2};
+            trap_value = ex_instruction;
+        end else if (instruction_addr_misaligned) begin
+            trap_cause = '0;
+            trap_value = control_transfer_target;
+        end else if (ex_ebreak) begin
+            trap_cause = {{(N-2){1'b0}}, 2'd3};
+        end else if (load_misaligned_exception) begin
+            trap_cause = {{(N-3){1'b0}}, 3'd4};
+            trap_value = ex_alu_result;
+        end else if (store_misaligned_exception) begin
+            trap_cause = {{(N-3){1'b0}}, 3'd6};
+            trap_value = ex_alu_result;
+        end
+    end
 
     csr_file #(.N(N)) machine_csrs (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_csr_addr(ex_csr_addr),
         .o_csr_rdata(ex_csr_rdata),
+        .o_csr_valid(csr_valid),
+        .o_csr_writable(csr_writable),
         .i_csr_write(csr_write),
         .i_csr_wdata(ex_csr_wdata),
         .i_trap_enter(trap_enter),
         .i_trap_pc(ex_pc),
         .i_trap_cause(trap_cause),
-        .i_trap_value('0),
+        .i_trap_value(trap_value),
         .i_mret(mret_taken),
         .i_retire(o_commit_valid),
         .i_irq_software(i_irq_software),

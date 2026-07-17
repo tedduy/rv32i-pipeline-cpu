@@ -44,6 +44,7 @@ module id_ex_register #(
     input  logic             i_ecall,
     input  logic             i_ebreak,
     input  logic             i_mret,
+    input  logic             i_illegal,
     
     // Outputs to EX stage
     output logic             o_valid,
@@ -75,7 +76,8 @@ module id_ex_register #(
     output logic             o_csr_imm,
     output logic             o_ecall,
     output logic             o_ebreak,
-    output logic             o_mret
+    output logic             o_mret,
+    output logic             o_illegal
 );
 
     always_ff @(posedge i_clk or negedge i_arst_n) begin
@@ -111,6 +113,7 @@ module id_ex_register #(
             o_ecall       <= 1'b0;
             o_ebreak      <= 1'b0;
             o_mret        <= 1'b0;
+            o_illegal     <= 1'b0;
         end
         else if (i_stall) begin
             // Keep all outputs stable until the pending memory transfer finishes.
@@ -147,6 +150,7 @@ module id_ex_register #(
             o_ecall       <= 1'b0;
             o_ebreak      <= 1'b0;
             o_mret        <= 1'b0;
+            o_illegal     <= 1'b0;
         end
         else begin
             // Normal operation: Pass data through
@@ -180,6 +184,7 @@ module id_ex_register #(
             o_ecall       <= i_ecall;
             o_ebreak      <= i_ebreak;
             o_mret        <= i_mret;
+            o_illegal     <= i_illegal;
         end
     end
 

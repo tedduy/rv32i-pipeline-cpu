@@ -6,6 +6,8 @@ module csr_file #(
 
     input  logic [11:0]      i_csr_addr,
     output logic [N-1:0]     o_csr_rdata,
+    output logic             o_csr_valid,
+    output logic             o_csr_writable,
     input  logic             i_csr_write,
     input  logic [N-1:0]     i_csr_wdata,
 
@@ -76,6 +78,8 @@ module csr_file #(
 
     always_comb begin
         o_csr_rdata = '0;
+        o_csr_valid = 1'b1;
+        o_csr_writable = 1'b1;
         unique case (i_csr_addr)
             CSR_MSTATUS:   o_csr_rdata = {{(N-13){1'b0}}, 2'b11, 3'b000,
                                           mstatus_mpie, 3'b000, mstatus_mie, 3'b000};
@@ -85,12 +89,19 @@ module csr_file #(
             CSR_MEPC:      o_csr_rdata = mepc;
             CSR_MCAUSE:    o_csr_rdata = mcause;
             CSR_MTVAL:     o_csr_rdata = mtval;
-            CSR_MIP:       o_csr_rdata = mip;
+            CSR_MIP: begin
+                o_csr_rdata = mip;
+                o_csr_writable = 1'b0;
+            end
             CSR_MCYCLE:    o_csr_rdata = mcycle[31:0];
             CSR_MINSTRET:  o_csr_rdata = minstret[31:0];
             CSR_MCYCLEH:   o_csr_rdata = mcycle[63:32];
             CSR_MINSTRETH: o_csr_rdata = minstret[63:32];
-            default:       o_csr_rdata = '0;
+            default: begin
+                o_csr_rdata = '0;
+                o_csr_valid = 1'b0;
+                o_csr_writable = 1'b0;
+            end
         endcase
     end
 
