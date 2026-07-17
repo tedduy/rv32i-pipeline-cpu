@@ -6,12 +6,15 @@
 
 module rv32i_top #(
     parameter N = 32,
-    parameter IMEM_DEPTH = 256,
     parameter DMEM_BYTES = 256,
     parameter REG_DEPTH = 32
 )(
     input  logic i_clk,
     input  logic i_arst_n,
+
+    // External instruction memory interface (zero-wait-state)
+    output logic [N-1:0] o_imem_addr,
+    input  logic [N-1:0] i_imem_rdata,
     
     // Debug/Test outputs
     output logic [N-1:0] W_PC_out,
@@ -242,16 +245,10 @@ module rv32i_top #(
         .o_PC(if_pc_current)
     );
     
-    // Instruction Memory
-    instruction_memory #(
-        .N(N),
-        .DEPTH(IMEM_DEPTH)
-    ) if_imem (
-        .i_clk(i_clk),
-        .i_arst_n(i_arst_n),
-        .i_addr(if_pc_current),
-        .o_inst(if_instruction)
-    );
+    // Instruction memory is outside the CPU core. The current interface assumes
+    // a combinational/zero-wait-state response from the integration layer.
+    assign o_imem_addr  = if_pc_current;
+    assign if_instruction = i_imem_rdata;
     
     // ==========================================================================
     // IF/ID Pipeline Register

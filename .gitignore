@@ -32,6 +32,12 @@ modelsim.ini
 *.shm
 *.vpd
 *.jou
+ucli.key
+vc_hdrs.h
+DVEfiles/
+verdiLog/
+novas.conf
+novas.rc
 
 # Quartus generated directories
 fpga/**/db/

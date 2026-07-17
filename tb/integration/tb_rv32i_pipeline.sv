@@ -26,6 +26,8 @@ module tb_rv32i_pipeline #(
     logic         W_stall, W_flush;
     logic [N-1:0] W_immediate;
     logic         W_ALUSrc;
+    logic [N-1:0] imem_addr;
+    logic [N-1:0] imem_rdata;
     
     //==========================================================================
     // DUT Instantiation
@@ -34,6 +36,8 @@ module tb_rv32i_pipeline #(
     rv32i_top #(.N(N)) dut (
         .i_clk       (clk),
         .i_arst_n    (~rst),
+        .o_imem_addr (imem_addr),
+        .i_imem_rdata(imem_rdata),
         
         .W_PC_out    (W_PC_out),
         .instruction (instruction),
@@ -57,6 +61,16 @@ module tb_rv32i_pipeline #(
         .W_flush     (W_flush),
         .W_immediate (W_immediate),
         .W_ALUSrc    (W_ALUSrc)
+    );
+
+    instruction_memory #(
+        .N(N),
+        .DEPTH(77)
+    ) imem (
+        .i_clk   (clk),
+        .i_arst_n(~rst),
+        .i_addr  (imem_addr),
+        .o_inst  (imem_rdata)
     );
     
     //==========================================================================

@@ -19,6 +19,8 @@ module tb_full_verification #(
     logic [N-1:0] W_WB_data;
     logic [4:0]   W_rd_addr;
     logic         W_reg_write;
+    logic [N-1:0] imem_addr;
+    logic [N-1:0] imem_rdata;
     
     // Test tracking
     integer instruction_count = 0;
@@ -32,6 +34,8 @@ module tb_full_verification #(
     rv32i_top #(.N(N)) dut (
         .i_clk       (clk),
         .i_arst_n    (~rst),
+        .o_imem_addr (imem_addr),
+        .i_imem_rdata(imem_rdata),
         .W_PC_out    (W_PC_out),
         .instruction (instruction),
         .W_RD1       (),
@@ -50,6 +54,16 @@ module tb_full_verification #(
         .W_mem_rdata (),
         .W_stall     (),
         .W_flush     ()
+    );
+
+    instruction_memory #(
+        .N(N),
+        .DEPTH(77)
+    ) imem (
+        .i_clk   (clk),
+        .i_arst_n(~rst),
+        .i_addr  (imem_addr),
+        .o_inst  (imem_rdata)
     );
     
     //==========================================================================

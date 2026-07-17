@@ -1,8 +1,9 @@
 # ==============================================================================
-# Makefile for RV32I Pipeline CPU - QuestaSim
+# Makefile for RV32I Pipeline CPU - QuestaSim, VCS and Verdi
 # ==============================================================================
 
-.PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl distclean
+.PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
+	vcs vcs-compile vcs-run vcs-gui verdi distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -15,11 +16,14 @@
 SIM = vsim
 VLOG = vlog
 VLIB = vlib
+VCS = vcs
+VERDI = verdi
 
 # Directories
 WORK_DIR = work
 WORK_GL_DIR = work_gl
 LOG_DIR = logs
+VCS_BUILD_ROOT = build/vcs
 
 # Compile flags
 VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
@@ -28,6 +32,15 @@ VLOG_GL_FLAGS = +acc -work $(WORK_GL_DIR)
 # Simulation flags
 VSIM_FLAGS = -c -work $(WORK_DIR)
 VSIM_GL_FLAGS = -c -suppress 12110 -work $(WORK_GL_DIR)
+
+# VCS/Verdi configuration. Override with TB=<testbench>; the pipeline
+# integration test is used when TB is omitted.
+VCS_TOP = $(if $(TB),$(TB),tb_rv32i_pipeline)
+VCS_BUILD_DIR = $(VCS_BUILD_ROOT)/$(VCS_TOP)
+VCS_SIMV = $(VCS_BUILD_DIR)/simv
+VCS_FLAGS = -full64 -sverilog -timescale=1ns/1ps
+VCS_FLAGS += -debug_access+all -kdb
+VCS_FLAGS += -Mdir=$(VCS_BUILD_DIR)/csrc
 
 # File lists
 RTL_FILELIST = filelist.f
@@ -63,6 +76,14 @@ help:
 	@echo "  make verify           - Run write-back verification"
 	@echo "  make all              - Compile + run all tests"
 	@echo ""
+	@echo "Synopsys VCS/Verdi Commands:"
+	@echo "  make vcs TB=<name>         - Compile and run a testbench with VCS"
+	@echo "  make vcs-compile TB=<name> - Compile a testbench with VCS"
+	@echo "  make vcs-run TB=<name>     - Compile and run a testbench with VCS"
+	@echo "  make vcs-gui TB=<name>     - Run the VCS executable in Verdi GUI mode"
+	@echo "  make verdi TB=<name>       - Open the compiled VCS design in Verdi"
+	@echo "  Default TB: tb_rv32i_pipeline"
+	@echo ""
 	@echo "Gate-Level Simulation Commands:"
 	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
 	@echo "  make gl               - Run gate-level simulation"
@@ -77,6 +98,8 @@ help:
 	@echo "  make run TB=tb_rv32i_pipeline     - Test pipeline"
 	@echo "  make unit                         - Test all 10 units"
 	@echo "  make gl                           - Run gate-level sim"
+	@echo "  make vcs TB=tb_rv32i_pipeline    - Compile and run with VCS"
+	@echo "  make verdi TB=tb_rv32i_pipeline  - Open the VCS design in Verdi"
 	@echo ""
 	@echo "Unit Tests Available:"
 	@echo "  tb_alu_unit, tb_register_file, tb_immediate_generator, tb_branch_unit"
@@ -107,6 +130,39 @@ rtl-compile:
 	@echo ""
 	@echo "✓ RTL Compilation complete!"
 	@echo "=========================================="
+
+# Compile one RTL testbench with Synopsys VCS and generate the KDB database
+# consumed by Verdi. VCS compilation is top-specific, so each testbench gets
+# an independent build directory.
+vcs-compile:
+	@command -v $(VCS) >/dev/null 2>&1 || { echo "Error: VCS executable '$(VCS)' not found"; exit 1; }
+	@mkdir -p $(VCS_BUILD_DIR) $(LOG_DIR)
+	@echo "=========================================="
+	@echo "Compiling with VCS: $(VCS_TOP)"
+	@echo "=========================================="
+	@$(VCS) $(VCS_FLAGS) -top $(VCS_TOP) -f $(RTL_FILELIST) \
+		-o $(VCS_SIMV) -l $(LOG_DIR)/vcs_compile_$(VCS_TOP).log
+	@echo "VCS executable: $(VCS_SIMV)"
+
+# Friendly alias: compile and run with VCS.
+vcs: vcs-run
+
+vcs-run: vcs-compile
+	@echo "=========================================="
+	@echo "Running with VCS: $(VCS_TOP)"
+	@echo "=========================================="
+	@$(VCS_SIMV) -l $(LOG_DIR)/vcs_$(VCS_TOP).log
+	@echo "VCS log: $(LOG_DIR)/vcs_$(VCS_TOP).log"
+
+# Start the simulation executable with the integrated Verdi GUI.
+vcs-gui: vcs-compile
+	@command -v $(VERDI) >/dev/null 2>&1 || { echo "Error: Verdi executable '$(VERDI)' not found"; exit 1; }
+	@$(VCS_SIMV) -gui=verdi
+
+# Open the elaborated VCS design database for source/debug inspection.
+verdi: vcs-compile
+	@command -v $(VERDI) >/dev/null 2>&1 || { echo "Error: Verdi executable '$(VERDI)' not found"; exit 1; }
+	@$(VERDI) -dbdir $(VCS_SIMV).daidir -top $(VCS_TOP)
 
 # Compile the generated Sky130 netlist independently from RTL.
 gl-compile:
@@ -330,6 +386,7 @@ clean:
 	@echo "Cleaning all generated files..."
 	@echo "=========================================="
 	@rm -rf $(WORK_DIR) $(WORK_GL_DIR)
+	@rm -rf $(VCS_BUILD_ROOT)
 	@rm -rf *.wlf *.vcd
 	@rm -rf transcript
 	@rm -rf vsim.wlf vsim_stacktrace.vstf
