@@ -14,7 +14,9 @@ module id_ex_register #(
     input  logic             i_flush,      // Flush signal for branch/jump
     
     // Inputs from ID stage
+    input  logic             i_valid,
     input  logic [N-1:0]     i_pc,
+    input  logic [N-1:0]     i_instruction,
     input  logic [N-1:0]     i_rs1_data,
     input  logic [N-1:0]     i_rs2_data,
     input  logic [N-1:0]     i_immediate,
@@ -38,7 +40,9 @@ module id_ex_register #(
     input  logic             i_jalr,
     
     // Outputs to EX stage
+    output logic             o_valid,
     output logic [N-1:0]     o_pc,
+    output logic [N-1:0]     o_instruction,
     output logic [N-1:0]     o_rs1_data,
     output logic [N-1:0]     o_rs2_data,
     output logic [N-1:0]     o_immediate,
@@ -65,7 +69,9 @@ module id_ex_register #(
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n) begin
             // Reset: Clear all signals
+            o_valid       <= 1'b0;
             o_pc          <= 32'h0;
+            o_instruction <= 32'h00000013;
             o_rs1_data    <= 32'h0;
             o_rs2_data    <= 32'h0;
             o_immediate   <= 32'h0;
@@ -93,7 +99,9 @@ module id_ex_register #(
         end
         else if (i_flush) begin
             // Flush: Insert bubble (clear control signals but keep data)
+            o_valid       <= 1'b0;
             o_pc          <= 32'h0;
+            o_instruction <= 32'h00000013;
             o_rs1_data    <= 32'h0;
             o_rs2_data    <= 32'h0;
             o_immediate   <= 32'h0;
@@ -118,7 +126,9 @@ module id_ex_register #(
         end
         else begin
             // Normal operation: Pass data through
+            o_valid       <= i_valid;
             o_pc          <= i_pc;
+            o_instruction <= i_instruction;
             o_rs1_data    <= i_rs1_data;
             o_rs2_data    <= i_rs2_data;
             o_immediate   <= i_immediate;

@@ -2,6 +2,10 @@ module mem_wb_register #(parameter N = 32)(
     input  logic         i_clk,
     input  logic         i_arst_n,
     input  logic         i_stall,
+
+    input  logic         i_valid,
+    input  logic [N-1:0] i_pc,
+    input  logic [N-1:0] i_instruction,
     
     // Inputs cũ
     input  logic [N-1:0] i_alu_result,
@@ -11,6 +15,10 @@ module mem_wb_register #(parameter N = 32)(
     input  logic [4:0]   i_rd_addr,
     input  logic         i_reg_write,
     input  logic [1:0]   i_wb_sel,
+    input  logic         i_mem_write,
+    input  logic [N-1:0] i_mem_addr,
+    input  logic [N-1:0] i_mem_wdata,
+    input  logic [3:0]   i_mem_wstrb,
     
     // --- THÊM MỚI Ở ĐÂY ---
     input  logic         i_jal,
@@ -18,6 +26,9 @@ module mem_wb_register #(parameter N = 32)(
     input  logic         i_branch_taken, // <--- Quan trọng
     
     // Outputs cũ
+    output logic         o_valid,
+    output logic [N-1:0] o_pc,
+    output logic [N-1:0] o_instruction,
     output logic [N-1:0] o_alu_result,
     output logic [N-1:0] o_mem_read_data,
     output logic [N-1:0] o_return_addr,
@@ -25,6 +36,10 @@ module mem_wb_register #(parameter N = 32)(
     output logic [4:0]   o_rd_addr,
     output logic         o_reg_write,
     output logic [1:0]   o_wb_sel,
+    output logic         o_mem_write,
+    output logic [N-1:0] o_mem_addr,
+    output logic [N-1:0] o_mem_wdata,
+    output logic [3:0]   o_mem_wstrb,
     
     // --- THÊM MỚI Ở ĐÂY ---
     output logic         o_jal,
@@ -35,6 +50,9 @@ module mem_wb_register #(parameter N = 32)(
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n) begin
             // ... (Reset các biến cũ) ...
+            o_valid         <= 1'b0;
+            o_pc            <= '0;
+            o_instruction   <= 32'h00000013;
             o_alu_result    <= '0;
             o_mem_read_data <= '0;
             o_return_addr   <= '0;
@@ -42,6 +60,10 @@ module mem_wb_register #(parameter N = 32)(
             o_rd_addr       <= '0;
             o_reg_write     <= '0;
             o_wb_sel        <= '0;
+            o_mem_write     <= 1'b0;
+            o_mem_addr      <= '0;
+            o_mem_wdata     <= '0;
+            o_mem_wstrb     <= '0;
             
             // Reset biến mới
             o_jal           <= 1'b0;
@@ -51,6 +73,9 @@ module mem_wb_register #(parameter N = 32)(
             // Hold write-back state while an external memory transfer is pending.
         end else begin
             // ... (Gán các biến cũ) ...
+            o_valid         <= i_valid;
+            o_pc            <= i_pc;
+            o_instruction   <= i_instruction;
             o_alu_result    <= i_alu_result;
             o_mem_read_data <= i_mem_read_data;
             o_return_addr   <= i_return_addr;
@@ -58,6 +83,10 @@ module mem_wb_register #(parameter N = 32)(
             o_rd_addr       <= i_rd_addr;
             o_reg_write     <= i_reg_write;
             o_wb_sel        <= i_wb_sel;
+            o_mem_write     <= i_mem_write;
+            o_mem_addr      <= i_mem_addr;
+            o_mem_wdata     <= i_mem_wdata;
+            o_mem_wstrb     <= i_mem_wstrb;
             
             // Gán biến mới
             o_jal           <= i_jal;

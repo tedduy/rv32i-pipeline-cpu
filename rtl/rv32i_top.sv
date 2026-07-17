@@ -27,6 +27,18 @@ module rv32i_top #(
     output logic [3:0]   o_dmem_wstrb,
     input  logic [N-1:0] i_dmem_rdata,
     input  logic         i_dmem_ready,
+
+    // Architectural commit/retire interface
+    output logic         o_commit_valid,
+    output logic [N-1:0] o_commit_pc,
+    output logic [N-1:0] o_commit_instruction,
+    output logic         o_commit_rd_write,
+    output logic [4:0]   o_commit_rd_addr,
+    output logic [N-1:0] o_commit_rd_data,
+    output logic         o_commit_mem_write,
+    output logic [N-1:0] o_commit_mem_addr,
+    output logic [N-1:0] o_commit_mem_wdata,
+    output logic [3:0]   o_commit_mem_wstrb,
     
     // Debug/Test outputs
     output logic [N-1:0] W_PC_out,
@@ -64,6 +76,7 @@ module rv32i_top #(
     // ==========================================================================
     // IF/ID Pipeline Register Signals
     // ==========================================================================
+    logic         id_valid;
     logic [N-1:0] id_pc, id_instruction;
     
     // ==========================================================================
@@ -87,7 +100,9 @@ module rv32i_top #(
     // ==========================================================================
     // ID/EX Pipeline Register Signals
     // ==========================================================================
-    logic [N-1:0] ex_pc, ex_rs1_data, ex_rs2_data, ex_immediate;
+    logic         ex_valid;
+    logic [N-1:0] ex_pc, ex_instruction;
+    logic [N-1:0] ex_rs1_data, ex_rs2_data, ex_immediate;
     logic [4:0]   ex_rs1_addr, ex_rs2_addr, ex_rd_addr;
     logic         ex_reg_write, ex_mem_read, ex_mem_write;
     logic [1:0]   ex_wb_sel, ex_pc_sel;
@@ -114,6 +129,8 @@ module rv32i_top #(
     // ==========================================================================
     // EX/MEM Pipeline Register Signals
     // ==========================================================================
+    logic         mem_valid;
+    logic [N-1:0] mem_pc, mem_instruction;
     logic [N-1:0] mem_alu_result, mem_rs2_data;
     logic [N-1:0] mem_pc_branch_target, mem_jump_target, mem_return_addr;
     logic [N-1:0] mem_immediate;
@@ -135,10 +152,15 @@ module rv32i_top #(
     // ==========================================================================
     // MEM/WB Pipeline Register Signals
     // ==========================================================================
+    logic         wb_valid;
+    logic [N-1:0] wb_pc, wb_instruction;
     logic [N-1:0] wb_alu_result, wb_mem_read_data, wb_return_addr, wb_immediate;
     logic [4:0]   wb_rd_addr;
     logic         wb_reg_write;
     logic [1:0]   wb_wb_sel;
+    logic         wb_mem_write;
+    logic [N-1:0] wb_mem_addr, wb_mem_wdata;
+    logic [3:0]   wb_mem_wstrb;
     logic         wb_jal, wb_jalr;         // <--- UPDATE: Dây nối ở tầng WB
     logic         wb_branch_taken;         // <--- UPDATE: Dây nối ở tầng WB
     // Debug: Original register values for tracking
@@ -238,6 +260,20 @@ module rv32i_top #(
     assign W_flush        = flush_id_ex | flush_if_id;
     assign W_immediate    = wb_immediate;
     assign W_ALUSrc       = ex_alu_src;
+
+    // A commit pulse represents one architecturally completed instruction.
+    // Gate it during a global memory stall so a held WB payload cannot retire
+    // more than once.
+    assign o_commit_valid       = wb_valid && !memory_stall;
+    assign o_commit_pc          = wb_pc;
+    assign o_commit_instruction = wb_instruction;
+    assign o_commit_rd_write    = o_commit_valid && wb_reg_write && (wb_rd_addr != 5'd0);
+    assign o_commit_rd_addr     = wb_rd_addr;
+    assign o_commit_rd_data     = wb_data;
+    assign o_commit_mem_write   = o_commit_valid && wb_mem_write;
+    assign o_commit_mem_addr    = wb_mem_addr;
+    assign o_commit_mem_wdata   = wb_mem_wdata;
+    assign o_commit_mem_wstrb   = wb_mem_wstrb;
     
     // ==========================================================================
     // STAGE 1: INSTRUCTION FETCH (IF)
@@ -300,8 +336,10 @@ module rv32i_top #(
         .i_arst_n(i_arst_n),
         .i_stall(stall_if_id || memory_stall),
         .i_flush(flush_if_id),
+        .i_valid(o_imem_valid && i_imem_ready),
         .i_pc(if_pc_current),
         .i_instruction(if_instruction),
+        .o_valid(id_valid),
         .o_pc(id_pc),
         .o_instruction(id_instruction)
     );
@@ -384,7 +422,9 @@ module rv32i_top #(
         .i_arst_n(i_arst_n),
         .i_stall(memory_stall),
         .i_flush(flush_id_ex),
+        .i_valid(id_valid),
         .i_pc(id_pc),
+        .i_instruction(id_instruction),
         .i_rs1_data(id_rs1_data),
         .i_rs2_data(id_rs2_data),
         .i_immediate(id_immediate),
@@ -404,7 +444,9 @@ module rv32i_top #(
         .i_mem_type(id_mem_type),
         .i_jal(id_jal),
         .i_jalr(id_jalr),
+        .o_valid(ex_valid),
         .o_pc(ex_pc),
+        .o_instruction(ex_instruction),
         .o_rs1_data(ex_rs1_data),
         .o_rs2_data(ex_rs2_data),
         .o_immediate(ex_immediate),
@@ -527,6 +569,9 @@ module rv32i_top #(
         .i_arst_n(i_arst_n),
         .i_stall(memory_stall),
         .i_flush(1'b0),
+        .i_valid(ex_valid),
+        .i_pc(ex_pc),
+        .i_instruction(ex_instruction),
         .i_alu_result(ex_alu_result),
         .i_rs2_data(ex_rs2_data_forwarded),
         .i_pc_branch_target(ex_pc_branch_target),
@@ -547,6 +592,9 @@ module rv32i_top #(
         .o_jal(mem_jal),
         .o_jalr(mem_jalr),
         
+        .o_valid(mem_valid),
+        .o_pc(mem_pc),
+        .o_instruction(mem_instruction),
         .o_alu_result(mem_alu_result),
         .o_rs2_data(mem_rs2_data),
         .o_pc_branch_target(mem_pc_branch_target),
@@ -598,6 +646,9 @@ module rv32i_top #(
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_stall(memory_stall),
+        .i_valid(mem_valid),
+        .i_pc(mem_pc),
+        .i_instruction(mem_instruction),
         .i_alu_result(mem_alu_result),
         .i_mem_read_data(mem_load_data),
         .i_return_addr(mem_return_addr),
@@ -605,12 +656,19 @@ module rv32i_top #(
         .i_rd_addr(mem_rd_addr),
         .i_reg_write(mem_reg_write),
         .i_wb_sel(mem_wb_sel),
+        .i_mem_write(mem_mem_write),
+        .i_mem_addr(mem_alu_result),
+        .i_mem_wdata(mem_store_data),
+        .i_mem_wstrb(mem_byte_enable),
         
         // UPDATE: Chuyền các tín hiệu Debug qua WB
         .i_jal(mem_jal),
         .i_jalr(mem_jalr),
         .i_branch_taken(mem_branch_taken),
         
+        .o_valid(wb_valid),
+        .o_pc(wb_pc),
+        .o_instruction(wb_instruction),
         .o_jal(wb_jal),
         .o_jalr(wb_jalr),
         .o_branch_taken(wb_branch_taken),
@@ -621,7 +679,11 @@ module rv32i_top #(
         .o_immediate(wb_immediate),
         .o_rd_addr(wb_rd_addr),
         .o_reg_write(wb_reg_write),
-        .o_wb_sel(wb_wb_sel)
+        .o_wb_sel(wb_wb_sel),
+        .o_mem_write(wb_mem_write),
+        .o_mem_addr(wb_mem_addr),
+        .o_mem_wdata(wb_mem_wdata),
+        .o_mem_wstrb(wb_mem_wstrb)
     );
     
     // Track original RD1/RD2 values through WB stage

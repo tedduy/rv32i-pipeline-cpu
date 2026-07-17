@@ -14,10 +14,12 @@ module if_id_register #(
     input  logic             i_flush,      // Flush signal for branch/jump
     
     // Inputs from IF stage
+    input  logic             i_valid,
     input  logic [N-1:0]     i_pc,
     input  logic [N-1:0]     i_instruction,
     
     // Outputs to ID stage
+    output logic             o_valid,
     output logic [N-1:0]     o_pc,
     output logic [N-1:0]     o_instruction
 );
@@ -25,16 +27,19 @@ module if_id_register #(
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n) begin
             // Reset: Insert NOP (ADDI x0, x0, 0)
+            o_valid       <= 1'b0;
             o_pc          <= 32'h0;
             o_instruction <= 32'h00000013;  // NOP
         end
         else if (i_flush) begin
             // Flush: Insert NOP (bubble)
+            o_valid       <= 1'b0;
             o_pc          <= 32'h0;
             o_instruction <= 32'h00000013;  // NOP
         end
         else if (!i_stall) begin
             // Normal operation: Pass data through
+            o_valid       <= i_valid;
             o_pc          <= i_pc;
             o_instruction <= i_instruction;
         end

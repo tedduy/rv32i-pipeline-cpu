@@ -13,6 +13,9 @@ module ex_mem_register #(
     input  logic             i_flush,
     
     // Inputs from EX stage
+    input  logic             i_valid,
+    input  logic [N-1:0]     i_pc,
+    input  logic [N-1:0]     i_instruction,
     input  logic [N-1:0]     i_alu_result,
     input  logic [N-1:0]     i_rs2_data,
     input  logic [N-1:0]     i_pc_branch_target,
@@ -34,6 +37,9 @@ module ex_mem_register #(
     input  logic             i_jalr,
     
     // Outputs to MEM stage
+    output logic             o_valid,
+    output logic [N-1:0]     o_pc,
+    output logic [N-1:0]     o_instruction,
     output logic [N-1:0]     o_alu_result,
     output logic [N-1:0]     o_rs2_data,
     output logic [N-1:0]     o_pc_branch_target,
@@ -58,6 +64,9 @@ module ex_mem_register #(
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n) begin
             // Reset logic
+            o_valid            <= 1'b0;
+            o_pc               <= '0;
+            o_instruction      <= 32'h00000013;
             o_alu_result       <= 32'h0;
             o_rs2_data         <= 32'h0;
             o_pc_branch_target <= 32'h0;
@@ -81,6 +90,9 @@ module ex_mem_register #(
         end
         else if (i_flush) begin
             // Flush logic
+            o_valid            <= 1'b0;
+            o_pc               <= '0;
+            o_instruction      <= 32'h00000013;
             o_alu_result       <= 32'h0;
             o_rs2_data         <= 32'h0;
             o_pc_branch_target <= 32'h0;
@@ -101,6 +113,9 @@ module ex_mem_register #(
         end
         else begin
             // Normal operation
+            o_valid            <= i_valid;
+            o_pc               <= i_pc;
+            o_instruction      <= i_instruction;
             o_alu_result       <= i_alu_result;
             o_rs2_data         <= i_rs2_data;
             o_pc_branch_target <= i_pc_branch_target;

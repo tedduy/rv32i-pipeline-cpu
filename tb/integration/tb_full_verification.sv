@@ -51,10 +51,22 @@ module tb_full_verification #(
         .o_dmem_wstrb(dmem_wstrb),
         .i_dmem_rdata(dmem_rdata),
         .i_dmem_ready(dmem_ready),
+        .o_commit_valid(),
+        .o_commit_pc(),
+        .o_commit_instruction(),
+        .o_commit_rd_write(),
+        .o_commit_rd_addr(),
+        .o_commit_rd_data(),
+        .o_commit_mem_write(),
+        .o_commit_mem_addr(),
+        .o_commit_mem_wdata(),
+        .o_commit_mem_wstrb(),
         .W_PC_out    (W_PC_out),
         .instruction (instruction),
         .W_RD1       (),
         .W_RD2       (),
+        .W_m1        (),
+        .W_m2        (),
         .W_ALUout    (),
         .W_WB_data   (W_WB_data),
         .W_rd_addr   (W_rd_addr),
@@ -68,7 +80,9 @@ module tb_full_verification #(
         .W_mem_wdata (),
         .W_mem_rdata (),
         .W_stall     (),
-        .W_flush     ()
+        .W_flush     (),
+        .W_immediate (),
+        .W_ALUSrc    ()
     );
 
     assign imem_ready = 1'b1;

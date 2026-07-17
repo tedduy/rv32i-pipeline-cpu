@@ -10,6 +10,19 @@ Thiết kế có data forwarding, load-use hazard detection và flush khi branch
 
 Địa chỉ khởi động được cấu hình qua tham số `RESET_VECTOR` của `rv32i_top`; giá trị mặc định là `0x0000_0000`.
 
+## Commit/retire interface
+
+Khi một instruction hoàn tất theo đúng thứ tự chương trình, core phát một xung
+`o_commit_valid` kèm theo:
+
+- `o_commit_pc`, `o_commit_instruction`: PC và mã lệnh đã retire.
+- `o_commit_rd_write`, `o_commit_rd_addr`, `o_commit_rd_data`: thay đổi register kiến trúc.
+- `o_commit_mem_write`, `o_commit_mem_addr`, `o_commit_mem_wdata`, `o_commit_mem_wstrb`: side effect của store.
+
+Bubble, instruction bị flush và chu kỳ đang chờ memory không tạo commit. Interface
+này phù hợp để làm scoreboard, trace hoặc lockstep checker mà không phải đọc các
+tín hiệu debug nội bộ.
+
 ## Bắt đầu đọc từ đâu?
 
 Đọc theo thứ tự sau để hiểu thiết kế nhanh nhất:
@@ -77,6 +90,9 @@ make pipeline
 
 # Chạy write-back verification
 make verify
+
+# Kiểm tra thứ tự retire và side effect
+make vcs TB=tb_commit_interface
 
 # Mở waveform của pipeline
 make wave TB=tb_rv32i_pipeline

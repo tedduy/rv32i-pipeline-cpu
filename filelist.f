@@ -42,6 +42,7 @@ tb/integration/tb_rv32i_pipeline.sv
 tb/integration/tb_load_use_hazard.sv
 tb/integration/tb_memory_wait_states.sv
 tb/integration/tb_reset_vector.sv
+tb/integration/tb_commit_interface.sv
 
 tb/unit/tb_alu_unit.sv
 tb/unit/tb_register_file.sv

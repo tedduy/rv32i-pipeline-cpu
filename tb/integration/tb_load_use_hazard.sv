@@ -34,6 +34,16 @@ module tb_load_use_hazard;
         .o_dmem_wstrb  (dmem_wstrb),
         .i_dmem_rdata  (dmem_rdata),
         .i_dmem_ready  (dmem_ready),
+        .o_commit_valid(),
+        .o_commit_pc(),
+        .o_commit_instruction(),
+        .o_commit_rd_write(),
+        .o_commit_rd_addr(),
+        .o_commit_rd_data(),
+        .o_commit_mem_write(),
+        .o_commit_mem_addr(),
+        .o_commit_mem_wdata(),
+        .o_commit_mem_wstrb(),
         .W_stall       (stall)
     );
 
