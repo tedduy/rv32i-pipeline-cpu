@@ -18,6 +18,12 @@ module tb_control_unit;
   logic [2:0]  MemType;
   logic        JAL;
   logic        JALR;
+  logic        CsrEn;
+  logic [1:0]  CsrOp;
+  logic        CsrImm;
+  logic        Ecall;
+  logic        Ebreak;
+  logic        Mret;
 
   // Instantiate DUT
   control_unit dut (
@@ -35,7 +41,13 @@ module tb_control_unit;
     .o_BranchType(BranchType),
     .o_MemType(MemType),
     .o_JAL(JAL),
-    .o_JALR(JALR)
+    .o_JALR(JALR),
+    .o_CsrEn(CsrEn),
+    .o_CsrOp(CsrOp),
+    .o_CsrImm(CsrImm),
+    .o_Ecall(Ecall),
+    .o_Ebreak(Ebreak),
+    .o_Mret(Mret)
   );
 
   // Test counter
@@ -151,6 +163,38 @@ module tb_control_unit;
     // AUIPC x1, 0x12345
     instruction = {20'h12345, 5'd1, 7'b0010111};
     check_signals(1'b1, 1'b0, 1'b0, 3'b011, 2'b00, 2'b00, 1'b1, 1'b1, 4'b0000, 1'b0, 1'b0, 1'b0, "AUIPC");
+
+    // Task 8: Test SYSTEM/CSR decode
+    $display("\n--- Task 8: SYSTEM/CSR Instructions ---");
+    instruction = 32'h3050_9073; // csrw mtvec, x1
+    #1;
+    test_count++;
+    if (CsrEn && !CsrImm && CsrOp == 2'b00 && RegWrite) begin
+      $display("[PASS] CSRRW");
+      pass_count++;
+    end else begin
+      $display("[FAIL] CSRRW decode");
+    end
+
+    instruction = 32'h0000_0073; // ecall
+    #1;
+    test_count++;
+    if (Ecall && !Ebreak && !Mret && !RegWrite) begin
+      $display("[PASS] ECALL");
+      pass_count++;
+    end else begin
+      $display("[FAIL] ECALL decode");
+    end
+
+    instruction = 32'h3020_0073; // mret
+    #1;
+    test_count++;
+    if (Mret && !Ecall && !Ebreak && !RegWrite) begin
+      $display("[PASS] MRET");
+      pass_count++;
+    end else begin
+      $display("[FAIL] MRET decode");
+    end
 
     // Summary
     $display("\n=== Test Summary ===");

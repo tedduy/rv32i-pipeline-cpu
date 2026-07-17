@@ -23,7 +23,15 @@ module control_unit (
   
   // Jump control signals
   output logic        o_JAL,             // JAL instruction → Jump Unit
-  output logic        o_JALR             // JALR instruction → Jump Unit
+  output logic        o_JALR,            // JALR instruction → Jump Unit
+
+  // Machine-mode SYSTEM/CSR control signals
+  output logic        o_CsrEn,
+  output logic [1:0]  o_CsrOp,           // 00=write, 01=set, 10=clear
+  output logic        o_CsrImm,
+  output logic        o_Ecall,
+  output logic        o_Ebreak,
+  output logic        o_Mret
 );
 
   // Extract instruction fields
@@ -47,7 +55,8 @@ module control_unit (
     OP_LOAD   = 7'b0000011,  // LB, LH, LW, LBU, LHU (5)
     OP_STORE  = 7'b0100011,  // SB, SH, SW (3)
     OP_IMM    = 7'b0010011,  // ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI (9)
-    OP_REG    = 7'b0110011;  // ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND (10)
+    OP_REG    = 7'b0110011,  // ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND (10)
+    OP_SYSTEM = 7'b1110011;  // ECALL, EBREAK, MRET and Zicsr
 
   // ==========================================================================
   // Control Signal Encoding
@@ -107,6 +116,12 @@ module control_unit (
     o_MemType    = 3'b010;     // Default word access
     o_JAL        = 1'b0;
     o_JALR       = 1'b0;
+    o_CsrEn      = 1'b0;
+    o_CsrOp      = 2'b00;
+    o_CsrImm     = 1'b0;
+    o_Ecall      = 1'b0;
+    o_Ebreak     = 1'b0;
+    o_Mret       = 1'b0;
 
     case (opcode)
       // ======================================================================
@@ -252,6 +267,36 @@ module control_unit (
           3'b110: o_ALUCtrl = ALU_OR;    // OR
           3'b111: o_ALUCtrl = ALU_AND;   // AND
           default: o_ALUCtrl = ALU_ADD;
+        endcase
+      end
+
+      // ======================================================================
+      // Machine-mode SYSTEM and Zicsr instructions
+      // ======================================================================
+      OP_SYSTEM: begin
+        case (funct3)
+          3'b000: begin
+            case (i_instruction)
+              32'h0000_0073: o_Ecall  = 1'b1;
+              32'h0010_0073: o_Ebreak = 1'b1;
+              32'h3020_0073: o_Mret   = 1'b1;
+              default: begin end
+            endcase
+          end
+          3'b001, 3'b010, 3'b011,
+          3'b101, 3'b110, 3'b111: begin
+            o_CsrEn      = 1'b1;
+            o_RegWrite   = 1'b1;
+            o_WBSel      = WB_ALU;
+            o_CsrImm     = funct3[2];
+            case (funct3[1:0])
+              2'b01: o_CsrOp = 2'b00; // CSRRW/CSRRWI
+              2'b10: o_CsrOp = 2'b01; // CSRRS/CSRRSI
+              2'b11: o_CsrOp = 2'b10; // CSRRC/CSRRCI
+              default: o_CsrOp = 2'b00;
+            endcase
+          end
+          default: begin end
         endcase
       end
 

@@ -3,6 +3,7 @@
 +incdir+rtl/stages/decode
 +incdir+rtl/stages/execute
 +incdir+rtl/stages/memory
++incdir+rtl/stages/system
 +incdir+rtl/pipeline
 +incdir+rtl/hazard
 +incdir+tb/unit
@@ -27,6 +28,8 @@ rtl/stages/execute/jump_unit.sv
 rtl/stages/memory/load_store_unit.sv
 rtl/stages/memory/data_memory.sv
 
+rtl/stages/system/csr_file.sv
+
 rtl/pipeline/if_id_register.sv
 rtl/pipeline/id_ex_register.sv
 rtl/pipeline/ex_mem_register.sv
@@ -43,6 +46,7 @@ tb/integration/tb_load_use_hazard.sv
 tb/integration/tb_memory_wait_states.sv
 tb/integration/tb_reset_vector.sv
 tb/integration/tb_commit_interface.sv
+tb/integration/tb_machine_csr_trap.sv
 
 tb/unit/tb_alu_unit.sv
 tb/unit/tb_register_file.sv

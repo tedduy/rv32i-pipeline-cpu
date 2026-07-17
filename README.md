@@ -10,6 +10,11 @@ Thiết kế có data forwarding, load-use hazard detection và flush khi branch
 
 Địa chỉ khởi động được cấu hình qua tham số `RESET_VECTOR` của `rv32i_top`; giá trị mặc định là `0x0000_0000`.
 
+Core hỗ trợ các lệnh CSR của extension Zicsr, `ECALL`, `EBREAK` và `MRET` trong
+machine mode. Các CSR hiện có gồm `mstatus`, `mtvec`, `mscratch`, `mepc`,
+`mcause`, `mtval`, `mcycle` và `minstret`. External interrupt chưa được nối ở
+mốc này.
+
 ## Commit/retire interface
 
 Khi một instruction hoàn tất theo đúng thứ tự chương trình, core phát một xung
@@ -44,7 +49,8 @@ rv32i-pipeline-cpu/
 │   │   ├── fetch/            # IF: PC và model instruction memory bên ngoài core
 │   │   ├── decode/           # ID: control, immediate, register file
 │   │   ├── execute/          # EX: ALU, branch và jump
-│   │   └── memory/           # MEM: load/store và model data memory bên ngoài core
+│   │   ├── memory/           # MEM: load/store và model data memory bên ngoài core
+│   │   └── system/           # Machine-mode CSR và trap state
 │   ├── pipeline/             # IF/ID, ID/EX, EX/MEM, MEM/WB
 │   ├── hazard/               # Forwarding và hazard detection
 │   └── common/               # Adder và mux dùng chung
@@ -93,6 +99,9 @@ make verify
 
 # Kiểm tra thứ tự retire và side effect
 make vcs TB=tb_commit_interface
+
+# Kiểm tra CSR, ECALL, trap handler và MRET
+make vcs TB=tb_machine_csr_trap
 
 # Mở waveform của pipeline
 make wave TB=tb_rv32i_pipeline

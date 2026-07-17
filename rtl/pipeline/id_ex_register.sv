@@ -38,6 +38,12 @@ module id_ex_register #(
     input  logic [2:0]       i_mem_type,
     input  logic             i_jal,
     input  logic             i_jalr,
+    input  logic             i_csr_en,
+    input  logic [1:0]       i_csr_op,
+    input  logic             i_csr_imm,
+    input  logic             i_ecall,
+    input  logic             i_ebreak,
+    input  logic             i_mret,
     
     // Outputs to EX stage
     output logic             o_valid,
@@ -63,7 +69,13 @@ module id_ex_register #(
     output logic [2:0]       o_branch_type,
     output logic [2:0]       o_mem_type,
     output logic             o_jal,
-    output logic             o_jalr
+    output logic             o_jalr,
+    output logic             o_csr_en,
+    output logic [1:0]       o_csr_op,
+    output logic             o_csr_imm,
+    output logic             o_ecall,
+    output logic             o_ebreak,
+    output logic             o_mret
 );
 
     always_ff @(posedge i_clk or negedge i_arst_n) begin
@@ -93,6 +105,12 @@ module id_ex_register #(
             o_mem_type    <= 3'b0;
             o_jal         <= 1'b0;
             o_jalr        <= 1'b0;
+            o_csr_en      <= 1'b0;
+            o_csr_op      <= 2'b0;
+            o_csr_imm     <= 1'b0;
+            o_ecall       <= 1'b0;
+            o_ebreak      <= 1'b0;
+            o_mret        <= 1'b0;
         end
         else if (i_stall) begin
             // Keep all outputs stable until the pending memory transfer finishes.
@@ -123,6 +141,12 @@ module id_ex_register #(
             o_mem_type    <= 3'b0;
             o_jal         <= 1'b0;
             o_jalr        <= 1'b0;
+            o_csr_en      <= 1'b0;
+            o_csr_op      <= 2'b0;
+            o_csr_imm     <= 1'b0;
+            o_ecall       <= 1'b0;
+            o_ebreak      <= 1'b0;
+            o_mret        <= 1'b0;
         end
         else begin
             // Normal operation: Pass data through
@@ -150,6 +174,12 @@ module id_ex_register #(
             o_mem_type    <= i_mem_type;
             o_jal         <= i_jal;
             o_jalr        <= i_jalr;
+            o_csr_en      <= i_csr_en;
+            o_csr_op      <= i_csr_op;
+            o_csr_imm     <= i_csr_imm;
+            o_ecall       <= i_ecall;
+            o_ebreak      <= i_ebreak;
+            o_mret        <= i_mret;
         end
     end
 

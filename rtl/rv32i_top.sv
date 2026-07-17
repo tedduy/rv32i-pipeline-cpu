@@ -96,6 +96,9 @@ module rv32i_top #(
     logic [2:0]  id_branch_type;
     logic [2:0]  id_mem_type;
     logic        id_jal, id_jalr;
+    logic        id_csr_en, id_csr_imm;
+    logic [1:0]  id_csr_op;
+    logic        id_ecall, id_ebreak, id_mret;
     
     // ==========================================================================
     // ID/EX Pipeline Register Signals
@@ -111,6 +114,9 @@ module rv32i_top #(
     logic         ex_branch_en;
     logic [2:0]   ex_branch_type, ex_mem_type;
     logic         ex_jal, ex_jalr;
+    logic         ex_csr_en, ex_csr_imm;
+    logic [1:0]   ex_csr_op;
+    logic         ex_ecall, ex_ebreak, ex_mret;
     // Debug: Original register values for tracking
     logic [N-1:0] ex_rd1_orig, ex_rd2_orig;
     
@@ -125,6 +131,15 @@ module rv32i_top #(
     logic         ex_branch_taken;
     logic [N-1:0] ex_jump_target, ex_return_addr;
     logic [N-1:0] ex_rs2_data_forwarded;  // For store operations
+    logic [N-1:0] ex_result;
+
+    // Machine-mode CSR/trap signals
+    logic [11:0]  ex_csr_addr;
+    logic [N-1:0] ex_csr_rdata, ex_csr_operand, ex_csr_wdata;
+    logic [N-1:0] csr_mtvec, csr_mepc;
+    logic         csr_write;
+    logic         trap_enter, mret_taken, system_redirect;
+    logic [N-1:0] system_redirect_pc;
     
     // ==========================================================================
     // EX/MEM Pipeline Register Signals
@@ -175,6 +190,7 @@ module rv32i_top #(
     // Hazard Detection Signals
     // ==========================================================================
     logic stall_pc, stall_if_id, flush_id_ex, flush_if_id;
+    logic pipeline_flush_id_ex, pipeline_flush_if_id;
     logic imem_wait, dmem_wait, memory_stall;
     logic dmem_request, dmem_complete;
     
@@ -257,7 +273,7 @@ module rv32i_top #(
     assign dmem_wait      = o_dmem_valid && !i_dmem_ready;
     assign memory_stall   = imem_wait || dmem_wait;
     assign W_stall        = stall_if_id || memory_stall;
-    assign W_flush        = flush_id_ex | flush_if_id;
+    assign W_flush        = pipeline_flush_id_ex | pipeline_flush_if_id;
     assign W_immediate    = wb_immediate;
     assign W_ALUSrc       = ex_alu_src;
 
@@ -288,6 +304,7 @@ module rv32i_top #(
     
     // PC next selection (from EX stage for branches/jumps)
     logic [31:0] branch_or_plus4;
+    logic [31:0] normal_pc_next;
     assign branch_or_plus4 = ex_branch_taken ? ex_pc_branch_target : if_pc_plus_4;
     
     mux4to1 #(.N(32)) if_pc_mux (
@@ -296,8 +313,10 @@ module rv32i_top #(
         .i_d2(ex_jump_target),
         .i_d3(ex_jump_target),
         .i_sel(ex_pc_sel),
-        .o_y(if_pc_next)
+        .o_y(normal_pc_next)
     );
+
+    assign if_pc_next = system_redirect ? system_redirect_pc : normal_pc_next;
     
     // Program Counter (with stall capability)
     program_counter #(
@@ -335,7 +354,7 @@ module rv32i_top #(
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_stall(stall_if_id || memory_stall),
-        .i_flush(flush_if_id),
+        .i_flush(pipeline_flush_if_id),
         .i_valid(o_imem_valid && i_imem_ready),
         .i_pc(if_pc_current),
         .i_instruction(if_instruction),
@@ -369,7 +388,13 @@ module rv32i_top #(
         .o_BranchType(id_branch_type),
         .o_MemType(id_mem_type),
         .o_JAL(id_jal),
-        .o_JALR(id_jalr)
+        .o_JALR(id_jalr),
+        .o_CsrEn(id_csr_en),
+        .o_CsrOp(id_csr_op),
+        .o_CsrImm(id_csr_imm),
+        .o_Ecall(id_ecall),
+        .o_Ebreak(id_ebreak),
+        .o_Mret(id_mret)
     );
     
     // Register File (write happens in WB stage)
@@ -412,6 +437,9 @@ module rv32i_top #(
         .o_flush_id_ex(flush_id_ex),
         .o_flush_if_id(flush_if_id)
     );
+
+    assign pipeline_flush_if_id = flush_if_id || system_redirect;
+    assign pipeline_flush_id_ex = flush_id_ex || system_redirect;
     
     // ==========================================================================
     // ID/EX Pipeline Register
@@ -421,7 +449,7 @@ module rv32i_top #(
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_stall(memory_stall),
-        .i_flush(flush_id_ex),
+        .i_flush(pipeline_flush_id_ex),
         .i_valid(id_valid),
         .i_pc(id_pc),
         .i_instruction(id_instruction),
@@ -444,6 +472,12 @@ module rv32i_top #(
         .i_mem_type(id_mem_type),
         .i_jal(id_jal),
         .i_jalr(id_jalr),
+        .i_csr_en(id_csr_en),
+        .i_csr_op(id_csr_op),
+        .i_csr_imm(id_csr_imm),
+        .i_ecall(id_ecall),
+        .i_ebreak(id_ebreak),
+        .i_mret(id_mret),
         .o_valid(ex_valid),
         .o_pc(ex_pc),
         .o_instruction(ex_instruction),
@@ -465,7 +499,13 @@ module rv32i_top #(
         .o_branch_type(ex_branch_type),
         .o_mem_type(ex_mem_type),
         .o_jal(ex_jal),
-        .o_jalr(ex_jalr)
+        .o_jalr(ex_jalr),
+        .o_csr_en(ex_csr_en),
+        .o_csr_op(ex_csr_op),
+        .o_csr_imm(ex_csr_imm),
+        .o_ecall(ex_ecall),
+        .o_ebreak(ex_ebreak),
+        .o_mret(ex_mret)
     );
     
     // Track original RD1/RD2 values through EX stage
@@ -475,7 +515,7 @@ module rv32i_top #(
             ex_rd2_orig <= '0;
         end else if (memory_stall) begin
             // Hold debug state with the corresponding ID/EX payload.
-        end else if (flush_id_ex) begin
+        end else if (pipeline_flush_id_ex) begin
             ex_rd1_orig <= '0;
             ex_rd2_orig <= '0;
         end else begin
@@ -559,6 +599,49 @@ module rv32i_top #(
         .o_jump_target(ex_jump_target),
         .o_return_addr(ex_return_addr)
     );
+
+    // CSR instructions read the old CSR value into rd and update the CSR in
+    // EX. Global memory stall gating prevents a held instruction from writing
+    // the CSR more than once.
+    assign ex_csr_addr    = ex_instruction[31:20];
+    assign ex_csr_operand = ex_csr_imm ? {{(N-5){1'b0}}, ex_instruction[19:15]}
+                                       : ex_alu_operand_a_forwarded;
+
+    always_comb begin
+        unique case (ex_csr_op)
+            2'b00: ex_csr_wdata = ex_csr_operand;
+            2'b01: ex_csr_wdata = ex_csr_rdata | ex_csr_operand;
+            2'b10: ex_csr_wdata = ex_csr_rdata & ~ex_csr_operand;
+            default: ex_csr_wdata = ex_csr_operand;
+        endcase
+    end
+
+    assign csr_write = ex_valid && ex_csr_en && !memory_stall &&
+                       ((ex_csr_op == 2'b00) || (ex_rs1_addr != 5'd0));
+    assign ex_result = ex_csr_en ? ex_csr_rdata : ex_alu_result;
+
+    assign trap_enter = ex_valid && (ex_ecall || ex_ebreak) && !memory_stall;
+    assign mret_taken = ex_valid && ex_mret && !memory_stall;
+    assign system_redirect = trap_enter || mret_taken;
+    assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00}
+                                           : {csr_mepc[N-1:2], 2'b00};
+
+    csr_file #(.N(N)) machine_csrs (
+        .i_clk(i_clk),
+        .i_arst_n(i_arst_n),
+        .i_csr_addr(ex_csr_addr),
+        .o_csr_rdata(ex_csr_rdata),
+        .i_csr_write(csr_write),
+        .i_csr_wdata(ex_csr_wdata),
+        .i_trap_enter(trap_enter),
+        .i_trap_pc(ex_pc),
+        .i_trap_cause(ex_ebreak ? {{(N-2){1'b0}}, 2'd3} : {{(N-4){1'b0}}, 4'd11}),
+        .i_trap_value('0),
+        .i_mret(mret_taken),
+        .i_retire(o_commit_valid),
+        .o_mtvec(csr_mtvec),
+        .o_mepc(csr_mepc)
+    );
     
     // ==========================================================================
     // EX/MEM Pipeline Register
@@ -568,11 +651,11 @@ module rv32i_top #(
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_stall(memory_stall),
-        .i_flush(1'b0),
+        .i_flush(trap_enter),
         .i_valid(ex_valid),
         .i_pc(ex_pc),
         .i_instruction(ex_instruction),
-        .i_alu_result(ex_alu_result),
+        .i_alu_result(ex_result),
         .i_rs2_data(ex_rs2_data_forwarded),
         .i_pc_branch_target(ex_pc_branch_target),
         .i_jump_target(ex_jump_target),
