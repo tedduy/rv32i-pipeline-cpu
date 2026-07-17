@@ -6,7 +6,8 @@
 
 module rv32i_top #(
     parameter N = 32,
-    parameter REG_DEPTH = 32
+    parameter REG_DEPTH = 32,
+    parameter logic [N-1:0] RESET_VECTOR = '0
 )(
     input  logic i_clk,
     input  logic i_arst_n,
@@ -263,7 +264,10 @@ module rv32i_top #(
     );
     
     // Program Counter (with stall capability)
-    program_counter #(.N(N)) if_pc_reg (
+    program_counter #(
+        .N(N),
+        .RESET_VECTOR(RESET_VECTOR)
+    ) if_pc_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_PC((stall_pc || memory_stall) ? if_pc_current : if_pc_next),

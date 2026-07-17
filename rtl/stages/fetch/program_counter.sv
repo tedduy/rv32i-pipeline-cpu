@@ -1,5 +1,6 @@
 module program_counter #(
-    parameter N = 32
+    parameter N = 32,
+    parameter logic [N-1:0] RESET_VECTOR = '0
 )(
     input  logic           i_clk,
     input  logic           i_arst_n,   // Active low reset
@@ -8,7 +9,7 @@ module program_counter #(
 );
   
   always_ff @(posedge i_clk or negedge i_arst_n) begin
-    if(!i_arst_n) o_PC <= '0;
+    if(!i_arst_n) o_PC <= RESET_VECTOR;
     else		  o_PC <= i_PC;
   end
   
