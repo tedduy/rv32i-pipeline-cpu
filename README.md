@@ -148,19 +148,24 @@ thức. Profile hiện tại chỉ bật extension `I`; `Zicsr` và machine-mode
 khai báo compliance cho đến khi core có đủ các CSR bắt buộc như `misa` và nhóm
 machine identification CSR.
 
-Sau khi cài dependencies của ACT4 và checkout branch `act4` của
-`riscv-arch-test`:
+Môi trường local nằm trong `.tools/act4/` và không được đưa vào Git. Nó không
+sửa `PATH`, `.bashrc` hay package hệ thống. Kiểm tra installation bằng:
 
 ```bash
-# Sinh các self-checking ELF chính thức
-make act-generate ACT_ROOT=/path/to/riscv-arch-test
+make act-tools-check
+
+# Sinh các self-checking ELF chính thức vào build/act4/generated/
+make act-generate
 
 # Chạy một ELF
 make act-run ELF=/path/to/test.elf
 
-# Chạy toàn bộ ELF trong một thư mục
-make act-regression ACT_ELF_DIR=/path/to/elfs
+# Chạy toàn bộ ELF vừa sinh
+make act-regression
 ```
+
+Có thể override `ACT_ROOT`, `ACT_TOOL_ROOT` hoặc `ACT_ELF_DIR` nếu muốn dùng
+một installation khác.
 
 `tb/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
 `0x1000_0000` và thanh ghi pass/fail tại `0x2000_0000`. Script Python đọc trực

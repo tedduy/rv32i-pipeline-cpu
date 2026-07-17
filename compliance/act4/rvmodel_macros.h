@@ -6,6 +6,26 @@
 /* Base-I tests execute directly from the core's reset state. */
 #define RVMODEL_BOOT_TO_MMODE
 
+/*
+ * ACT4 requires every target model to provide the interrupt hooks below,
+ * including configurations that only generate unprivileged Base-I tests.
+ * Interrupt injection is not implemented by the current testbench, so the
+ * hooks intentionally expand to no instructions.  Replace them with real
+ * testbench/MMIO controls before enabling interrupt or privileged tests.
+ */
+#define RVMODEL_INTERRUPT_LATENCY          10
+#define RVMODEL_TIMER_INT_SOON_DELAY       100
+#define RVMODEL_MAX_CYCLES_PER_TIMER_TICK  1
+
+#define RVMODEL_SET_MEXT_INT(_R1, _R2)
+#define RVMODEL_CLR_MEXT_INT(_R1, _R2)
+#define RVMODEL_SET_MSW_INT(_R1, _R2)
+#define RVMODEL_CLR_MSW_INT(_R1, _R2)
+#define RVMODEL_SET_SEXT_INT(_R1, _R2)
+#define RVMODEL_CLR_SEXT_INT(_R1, _R2)
+#define RVMODEL_SET_SSW_INT(_R1, _R2)
+#define RVMODEL_CLR_SSW_INT(_R1, _R2)
+
 #define RVMODEL_HALT_PASS  \
   li t0, 0x20000000       ;\
   li t1, 1                ;\

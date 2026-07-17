@@ -41,8 +41,16 @@ module register_file #(
         end
     end
 
-    // Đọc không đồng bộ; đảm bảo x0 luôn đọc về 0
-    assign o_rdata1 = (i_raddr1 == '0) ? '0 : regs[i_raddr1];
-    assign o_rdata2 = (i_raddr2 == '0) ? '0 : regs[i_raddr2];
+    // Asynchronous reads with same-cycle WB-to-ID bypass. Without this
+    // write-through path, an instruction entering ID on the same edge that WB
+    // updates one of its source registers can latch the previous value. Once
+    // that instruction reaches EX, the WB value is no longer available to the
+    // normal forwarding network.
+    assign o_rdata1 = (i_raddr1 == '0) ? '0 :
+                      ((i_we && (i_waddr == i_raddr1) && (i_waddr != '0)) ?
+                       i_wdata : regs[i_raddr1]);
+    assign o_rdata2 = (i_raddr2 == '0) ? '0 :
+                      ((i_we && (i_waddr == i_raddr2) && (i_waddr != '0)) ?
+                       i_wdata : regs[i_raddr2]);
 
 endmodule

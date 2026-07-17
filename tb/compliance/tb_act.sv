@@ -21,6 +21,26 @@ module tb_act;
     logic [3:0]  dmem_wstrb;
     logic [31:0] dmem_rdata;
 
+    logic        commit_valid;
+    logic [31:0] commit_pc;
+    logic [31:0] commit_instruction;
+    integer      commit_count;
+    logic [31:0] last_commit_pc;
+    logic [31:0] last_commit_instruction;
+    integer      trap_count;
+    logic [31:0] last_trap_pc;
+    logic [31:0] last_trap_cause;
+    logic [31:0] last_trap_value;
+    logic [31:0] first_trap_pc;
+    logic [31:0] first_trap_cause;
+    logic [31:0] first_trap_value;
+    integer      store_count;
+    logic [31:0] last_store_addr;
+    logic [31:0] last_store_data;
+    logic [31:0] commit_pc_history [0:15];
+    logic [31:0] commit_inst_history [0:15];
+    integer      commit_history_index;
+
     string       mem_hex;
     string       test_name;
     integer      max_cycles;
@@ -48,9 +68,9 @@ module tb_act;
         .o_dmem_wstrb          (dmem_wstrb),
         .i_dmem_rdata          (dmem_rdata),
         .i_dmem_ready          (1'b1),
-        .o_commit_valid        (),
-        .o_commit_pc           (),
-        .o_commit_instruction  (),
+        .o_commit_valid        (commit_valid),
+        .o_commit_pc           (commit_pc),
+        .o_commit_instruction  (commit_instruction),
         .o_commit_rd_write     (),
         .o_commit_rd_addr      (),
         .o_commit_rd_data      (),
@@ -115,6 +135,19 @@ module tb_act;
                     $finish;
                 end else begin
                     $display("RVCP-SUMMARY: TEST FAILED - Test File \"%s\"", test_name);
+                    $display("ACT4 diagnostic: commits=%0d last_pc=%08x last_inst=%08x",
+                             commit_count, last_commit_pc, last_commit_instruction);
+                    $display("ACT4 pipeline: IF=%08x ID=%08x EX=%08x MEM=%08x WB=%08x",
+                             dut.if_pc_current, dut.id_pc, dut.ex_pc, dut.mem_pc, dut.wb_pc);
+                    $display("ACT4 traps: count=%0d first_pc=%08x cause=%08x value=%08x",
+                             trap_count, first_trap_pc,
+                             first_trap_cause, first_trap_value);
+                    $display("ACT4 last 16 retired instructions (oldest to newest):");
+                    for (integer hist_idx = 0; hist_idx < 16; hist_idx = hist_idx + 1) begin
+                        $display("  pc=%08x inst=%08x",
+                                 commit_pc_history[(commit_history_index + hist_idx) & 15],
+                                 commit_inst_history[(commit_history_index + hist_idx) & 15]);
+                    end
                     $fatal(1, "ACT4 self-check reported failure code %0d", dmem_wdata);
                 end
             end else if (dmem_word_addr <= RAM_BYTES - 4) begin
@@ -129,10 +162,64 @@ module tb_act;
     always_ff @(posedge clk or negedge arst_n) begin
         if (!arst_n) begin
             cycle_count <= 0;
+            commit_count <= 0;
+            last_commit_pc <= 32'b0;
+            last_commit_instruction <= 32'b0;
+            trap_count <= 0;
+            last_trap_pc <= 32'b0;
+            last_trap_cause <= 32'b0;
+            last_trap_value <= 32'b0;
+            first_trap_pc <= 32'b0;
+            first_trap_cause <= 32'b0;
+            first_trap_value <= 32'b0;
+            store_count <= 0;
+            last_store_addr <= 32'b0;
+            last_store_data <= 32'b0;
+            commit_history_index <= 0;
+            for (integer hist_idx = 0; hist_idx < 16; hist_idx = hist_idx + 1) begin
+                commit_pc_history[hist_idx] <= 32'b0;
+                commit_inst_history[hist_idx] <= 32'b0;
+            end
         end else begin
             cycle_count <= cycle_count + 1;
-            if (cycle_count >= max_cycles)
+            if (commit_valid) begin
+                commit_count <= commit_count + 1;
+                last_commit_pc <= commit_pc;
+                last_commit_instruction <= commit_instruction;
+                commit_pc_history[commit_history_index] <= commit_pc;
+                commit_inst_history[commit_history_index] <= commit_instruction;
+                commit_history_index <= (commit_history_index + 1) & 15;
+            end
+            if (dut.trap_enter) begin
+                trap_count <= trap_count + 1;
+                last_trap_pc <= dut.ex_pc;
+                last_trap_cause <= dut.trap_cause;
+                last_trap_value <= dut.trap_value;
+                if (trap_count == 0) begin
+                    first_trap_pc <= dut.ex_pc;
+                    first_trap_cause <= dut.trap_cause;
+                    first_trap_value <= dut.trap_value;
+                end
+            end
+            if (dmem_valid && dmem_write) begin
+                store_count <= store_count + 1;
+                last_store_addr <= dmem_addr;
+                last_store_data <= dmem_wdata;
+            end
+            if (cycle_count >= max_cycles) begin
+                $display("ACT4 diagnostic: commits=%0d last_pc=%08x last_inst=%08x",
+                         commit_count, last_commit_pc, last_commit_instruction);
+                $display("ACT4 pipeline: IF=%08x ID=%08x EX=%08x MEM=%08x WB=%08x",
+                         dut.if_pc_current, dut.id_pc, dut.ex_pc, dut.mem_pc, dut.wb_pc);
+                $display("ACT4 traps: count=%0d last_pc=%08x cause=%08x value=%08x mtvec=%08x",
+                         trap_count, last_trap_pc, last_trap_cause,
+                         last_trap_value, dut.csr_mtvec);
+                $display("ACT4 first trap: pc=%08x cause=%08x value=%08x",
+                         first_trap_pc, first_trap_cause, first_trap_value);
+                $display("ACT4 stores: count=%0d last_addr=%08x last_data=%08x",
+                         store_count, last_store_addr, last_store_data);
                 $fatal(1, "ACT4 timeout after %0d cycles: %s", max_cycles, test_name);
+            end
         end
     end
 

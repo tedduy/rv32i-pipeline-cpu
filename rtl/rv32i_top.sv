@@ -211,6 +211,7 @@ module rv32i_top #(
     // Forwarding Signals
     // ==========================================================================
     logic [1:0] forward_a, forward_b;
+    logic [N-1:0] mem_forward_data;
     
     // ==========================================================================
     // Debug Output Assignments with Pipeline Tracking
@@ -556,12 +557,25 @@ module rv32i_top #(
         .o_forward_a(forward_a),
         .o_forward_b(forward_b)
     );
+
+    // EX/MEM forwarding must use the value that the instruction will
+    // architecturally write, not always the ALU output.  This matters for LUI
+    // (immediate), JAL/JALR (PC+4), and loads (memory data).
+    always_comb begin
+        unique case (mem_wb_sel)
+            2'b00:   mem_forward_data = mem_alu_result;
+            2'b01:   mem_forward_data = mem_load_data;
+            2'b10:   mem_forward_data = mem_return_addr;
+            2'b11:   mem_forward_data = mem_immediate;
+            default: mem_forward_data = mem_alu_result;
+        endcase
+    end
     
     // Forward rs1_data
     mux3to1 #(.N(N)) ex_forward_a_mux (
         .i_d0(ex_rs1_data),           // No forwarding
         .i_d1(wb_data),                // Forward from WB
-        .i_d2(mem_alu_result),         // Forward from MEM
+        .i_d2(mem_forward_data),        // Forward architectural MEM result
         .i_sel(forward_a),
         .o_y(ex_alu_operand_a_forwarded)
     );
@@ -570,7 +584,7 @@ module rv32i_top #(
     mux3to1 #(.N(N)) ex_forward_b_mux (
         .i_d0(ex_rs2_data),           // No forwarding
         .i_d1(wb_data),                // Forward from WB
-        .i_d2(mem_alu_result),         // Forward from MEM
+        .i_d2(mem_forward_data),        // Forward architectural MEM result
         .i_sel(forward_b),
         .o_y(ex_rs2_data_forwarded)
     );

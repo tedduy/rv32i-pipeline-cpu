@@ -3,7 +3,7 @@
 # ==============================================================================
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
-	vcs vcs-compile vcs-run vcs-gui verdi act-generate act-compile act-run \
+	vcs vcs-compile vcs-run vcs-gui verdi act-tools-check act-generate act-compile act-run \
 	act-regression distclean
 
 # Default target
@@ -28,6 +28,22 @@ VCS_BUILD_ROOT = build/vcs
 ACT_CONFIG = compliance/act4/test_config.yaml
 ACT_WORK_DIR = build/act4
 ACT_MAX_CYCLES ?= 1000000
+ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
+ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
+ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs
+ACT_ENV = env \
+	PATH="$(ACT_TOOL_ROOT)/bin:$(ACT_TOOL_ROOT)/toolchain/bin:$(ACT_TOOL_ROOT)/sail/bin:$$PATH" \
+	MISE_DATA_DIR="$(ACT_TOOL_ROOT)/mise-data" \
+	MISE_CACHE_DIR="$(ACT_TOOL_ROOT)/mise-cache" \
+	MISE_CONFIG_DIR="$(ACT_TOOL_ROOT)/mise-config" \
+	MISE_STATE_DIR="$(ACT_TOOL_ROOT)/mise-state" \
+	MISE_YES=1 \
+	MISE_OFFLINE=1 \
+	UV_CACHE_DIR="$(ACT_TOOL_ROOT)/uv-cache" \
+	UV_PYTHON_INSTALL_DIR="$(ACT_TOOL_ROOT)/python" \
+	XDG_DATA_HOME="$(ACT_TOOL_ROOT)/xdg-data" \
+	XDG_CACHE_HOME="$(ACT_TOOL_ROOT)/xdg-cache" \
+	XDG_CONFIG_HOME="$(ACT_TOOL_ROOT)/xdg-config"
 
 # Compile flags
 VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
@@ -89,9 +105,10 @@ help:
 	@echo "  Default TB: tb_rv32i_pipeline"
 	@echo ""
 	@echo "RISC-V ACT4 Compliance Commands:"
-	@echo "  make act-generate ACT_ROOT=/path/to/riscv-arch-test"
+	@echo "  make act-tools-check    - Verify the local ACT4 installation"
+	@echo "  make act-generate       - Generate official RV32I self-checking ELFs"
 	@echo "  make act-run ELF=/path/to/test.elf"
-	@echo "  make act-regression ACT_ELF_DIR=/path/to/elfs"
+	@echo "  make act-regression     - Run all generated RV32I ELFs"
 	@echo ""
 	@echo "Gate-Level Simulation Commands:"
 	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
@@ -150,11 +167,20 @@ rtl-compile:
 vcs-compile:
 	@command -v $(VCS) >/dev/null 2>&1 || { echo "Error: VCS executable '$(VCS)' not found"; exit 1; }
 	@mkdir -p $(VCS_BUILD_DIR) $(LOG_DIR)
+	@if [ ! -x "$(VCS_SIMV)" ] && [ -f "$(VCS_SIMV).daidir/.vcs.timestamp" ]; then \
+		echo "Removing stale VCS timestamp (simv is missing)..."; \
+		$(RM) "$(VCS_SIMV).daidir/.vcs.timestamp"; \
+	fi
 	@echo "=========================================="
 	@echo "Compiling with VCS: $(VCS_TOP)"
 	@echo "=========================================="
 	@$(VCS) $(VCS_FLAGS) -top $(VCS_TOP) -f $(RTL_FILELIST) \
 		-o $(VCS_SIMV) -l $(LOG_DIR)/vcs_compile_$(VCS_TOP).log
+	@test -x "$(VCS_SIMV)" || { \
+		echo "Error: VCS finished without creating executable '$(VCS_SIMV)'"; \
+		echo "Check $(LOG_DIR)/vcs_compile_$(VCS_TOP).log and the VCS license connection."; \
+		exit 1; \
+	}
 	@echo "VCS executable: $(VCS_SIMV)"
 
 # Friendly alias: compile and run with VCS.
@@ -177,14 +203,24 @@ verdi: vcs-compile
 	@command -v $(VERDI) >/dev/null 2>&1 || { echo "Error: Verdi executable '$(VERDI)' not found"; exit 1; }
 	@$(VERDI) -dbdir $(VCS_SIMV).daidir -top $(VCS_TOP)
 
-# Generate official ACT4 self-checking ELFs using a local checkout of the
-# riscv-arch-test ACT4 branch and this core's configuration.
-act-generate:
-	@if [ -z "$(ACT_ROOT)" ]; then \
-		echo "Error: set ACT_ROOT to the riscv-arch-test ACT4 checkout"; \
-		exit 1; \
-	fi
-	@$(MAKE) -C "$(ACT_ROOT)" CONFIG_FILES="$(abspath $(ACT_CONFIG))"
+# Keep ACT4 and all of its dependencies local to this repository. Nothing in
+# this environment is added to the user's login shell or system PATH.
+act-tools-check:
+	@test -x "$(ACT_TOOL_ROOT)/bin/mise" || { echo "Missing local mise"; exit 1; }
+	@test -x "$(ACT_TOOL_ROOT)/toolchain/bin/riscv32-none-elf-gcc" || { echo "Missing local RISC-V GCC"; exit 1; }
+	@test -x "$(ACT_TOOL_ROOT)/sail/bin/sail_riscv_sim" || { echo "Missing local Sail model"; exit 1; }
+	@test -f "$(ACT_ROOT)/Makefile" || { echo "Missing local riscv-arch-test checkout"; exit 1; }
+	@$(ACT_ENV) riscv32-none-elf-gcc --version | head -n 1
+	@$(ACT_ENV) sail_riscv_sim --version
+	@$(ACT_ENV) mise --version
+
+# Generate official ACT4 self-checking ELFs with the local tool environment.
+act-generate: act-tools-check
+	@mkdir -p "$(abspath $(ACT_WORK_DIR))/generated"
+	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" \
+		CONFIG_FILES="$(abspath $(ACT_CONFIG))" \
+		WORKDIR="$(abspath $(ACT_WORK_DIR))/generated" \
+		EXTENSIONS=I
 
 # Compile the unified-memory ACT4 harness once; it can run every generated ELF.
 act-compile: TB=tb_act
@@ -199,10 +235,6 @@ act-run: act-compile
 		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
 
 act-regression: act-compile
-	@if [ -z "$(ACT_ELF_DIR)" ]; then \
-		echo "Error: specify ACT_ELF_DIR=/path/to/act4/elfs"; \
-		exit 1; \
-	fi
 	@python3 scripts/run_act.py "$(ACT_ELF_DIR)" --simv "$(VCS_BUILD_ROOT)/tb_act/simv" \
 		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
 
