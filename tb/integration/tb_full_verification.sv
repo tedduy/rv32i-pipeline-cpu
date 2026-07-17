@@ -39,6 +39,9 @@ module tb_full_verification #(
     rv32i_top #(.N(N)) dut (
         .i_clk       (clk),
         .i_arst_n    (~rst),
+        .i_irq_software(1'b0),
+        .i_irq_timer   (1'b0),
+        .i_irq_external(1'b0),
         .o_imem_addr (imem_addr),
         .i_imem_rdata(imem_rdata),
         .o_imem_valid(imem_valid),

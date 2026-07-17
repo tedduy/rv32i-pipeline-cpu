@@ -47,6 +47,7 @@ tb/integration/tb_memory_wait_states.sv
 tb/integration/tb_reset_vector.sv
 tb/integration/tb_commit_interface.sv
 tb/integration/tb_machine_csr_trap.sv
+tb/integration/tb_machine_external_interrupt.sv
 
 tb/unit/tb_alu_unit.sv
 tb/unit/tb_register_file.sv

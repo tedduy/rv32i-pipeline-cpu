@@ -12,6 +12,11 @@ module rv32i_top #(
     input  logic i_clk,
     input  logic i_arst_n,
 
+    // Synchronous machine-mode interrupt requests
+    input  logic i_irq_software,
+    input  logic i_irq_timer,
+    input  logic i_irq_external,
+
     // External instruction memory interface
     output logic         o_imem_valid,
     output logic [N-1:0] o_imem_addr,
@@ -138,7 +143,9 @@ module rv32i_top #(
     logic [N-1:0] ex_csr_rdata, ex_csr_operand, ex_csr_wdata;
     logic [N-1:0] csr_mtvec, csr_mepc;
     logic         csr_write;
-    logic         trap_enter, mret_taken, system_redirect;
+    logic         sync_trap, irq_take, trap_enter, mret_taken, system_redirect;
+    logic         csr_irq_pending;
+    logic [N-1:0] csr_irq_cause, trap_cause;
     logic [N-1:0] system_redirect_pc;
     
     // ==========================================================================
@@ -620,11 +627,16 @@ module rv32i_top #(
                        ((ex_csr_op == 2'b00) || (ex_rs1_addr != 5'd0));
     assign ex_result = ex_csr_en ? ex_csr_rdata : ex_alu_result;
 
-    assign trap_enter = ex_valid && (ex_ecall || ex_ebreak) && !memory_stall;
+    assign sync_trap = ex_valid && (ex_ecall || ex_ebreak) && !memory_stall;
+    assign irq_take = ex_valid && csr_irq_pending && !sync_trap && !memory_stall;
+    assign trap_enter = sync_trap || irq_take;
     assign mret_taken = ex_valid && ex_mret && !memory_stall;
     assign system_redirect = trap_enter || mret_taken;
     assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00}
                                            : {csr_mepc[N-1:2], 2'b00};
+    assign trap_cause = irq_take ? csr_irq_cause
+                                 : (ex_ebreak ? {{(N-2){1'b0}}, 2'd3}
+                                               : {{(N-4){1'b0}}, 4'd11});
 
     csr_file #(.N(N)) machine_csrs (
         .i_clk(i_clk),
@@ -635,12 +647,17 @@ module rv32i_top #(
         .i_csr_wdata(ex_csr_wdata),
         .i_trap_enter(trap_enter),
         .i_trap_pc(ex_pc),
-        .i_trap_cause(ex_ebreak ? {{(N-2){1'b0}}, 2'd3} : {{(N-4){1'b0}}, 4'd11}),
+        .i_trap_cause(trap_cause),
         .i_trap_value('0),
         .i_mret(mret_taken),
         .i_retire(o_commit_valid),
+        .i_irq_software(i_irq_software),
+        .i_irq_timer(i_irq_timer),
+        .i_irq_external(i_irq_external),
         .o_mtvec(csr_mtvec),
-        .o_mepc(csr_mepc)
+        .o_mepc(csr_mepc),
+        .o_irq_pending(csr_irq_pending),
+        .o_irq_cause(csr_irq_cause)
     );
     
     // ==========================================================================
