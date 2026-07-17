@@ -353,6 +353,7 @@ module tb_full_verification #(
         // Reset
         rst = 1;
         repeat(3) @(posedge clk);
+        @(negedge clk);
         rst = 0;
         
         // Wait for all instructions to complete

@@ -27,7 +27,7 @@ input logic  i_clk,
     end else begin
       // ===== Generated RV32I Instructions - Verified Encoding =====
       
-      Imemory[0]  = 32'b00000000000000000000000000000000; // 0x00000000 | nop (encoded as 0)
+      Imemory[0]  = 32'h0000_0013; // addi x0, x0, 0 (architectural NOP)
       
       // ===== R-type (rs1, rs2 ∈ {x1,x2,x4,x5}; rd ∈ {x3,x6}) =====
       Imemory[1]  = 32'b00000000001000001000000110110011; // 0x002081b3 | add x3, x1, x2

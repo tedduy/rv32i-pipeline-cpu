@@ -61,7 +61,7 @@ module tb_instruction_memory;
     @(posedge clk);
     addr = 32'h00000000;
     @(posedge clk);
-    check_inst(32'h00000000, "Address 0x00: NOP");
+    check_inst(32'h00000013, "Address 0x00: NOP");
 
     // Task 2: Test sequential read
     $display("\n--- Task 2: Sequential Read ---");
@@ -95,7 +95,7 @@ module tb_instruction_memory;
     $display("\n--- Task 4: Boundary Addresses ---");
     addr = 32'h00000000; // First address
     @(posedge clk);
-    check_inst(32'h00000000, "First address: 0x00");
+    check_inst(32'h00000013, "First address: 0x00");
     
     addr = 32'h00000130; // Last address (76*4 = 304 = 0x130)
     @(posedge clk);

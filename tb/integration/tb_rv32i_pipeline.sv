@@ -295,6 +295,7 @@ module tb_rv32i_pipeline #(
         
         // Reset sequence
         repeat(3) @(posedge clk);
+        @(negedge clk);
         rst = 0;
         
         // Wait for completion
@@ -389,11 +390,15 @@ module tb_rv32i_pipeline #(
             if (W_PC_out != prev_pc) begin
                 prev_pc = W_PC_out;
                 
-                // Stop after 76 instructions executed (match report)
-                if (instruction_count >= 76) begin
+                // Stop only after the architectural test program reaches its
+                // final instruction. Counting toggling PCs alone can produce a
+                // false pass when the core is trapped in a short loop.
+                if (W_PC_out >= 32'h0000_0130) begin
                     finish_req = 1;
                     // Wait for pipeline to drain
                     repeat(7) @(posedge clk);
+                end else if (cycle_count >= 1000) begin
+                    $fatal(1, "Pipeline test timeout before reaching program end");
                 end
             end
         end

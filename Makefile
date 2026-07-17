@@ -3,7 +3,7 @@
 # ==============================================================================
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
-	vcs vcs-compile vcs-run vcs-gui verdi act-tools-check act-generate act-compile act-run \
+	vcs vcs-compile vcs-run vcs-gui vcs-regression verdi act-tools-check act-generate act-compile act-run \
 	act-regression distclean
 
 # Default target
@@ -77,6 +77,13 @@ UNIT_TESTS = tb_alu_unit tb_register_file tb_immediate_generator tb_branch_unit 
              tb_jump_unit tb_load_store_unit tb_control_unit tb_program_counter \
              tb_instruction_memory tb_data_memory
 
+INTEGRATION_TESTS = tb_rv32i_pipeline tb_full_verification tb_load_use_hazard \
+                    tb_memory_wait_states tb_reset_vector tb_commit_interface \
+                    tb_machine_csr_trap tb_machine_external_interrupt \
+                    tb_machine_exceptions
+
+VCS_REGRESSION_TESTS = $(UNIT_TESTS) $(INTEGRATION_TESTS)
+
 # ==============================================================================
 # Help
 # ==============================================================================
@@ -100,6 +107,7 @@ help:
 	@echo "  make vcs TB=<name>         - Compile and run a testbench with VCS"
 	@echo "  make vcs-compile TB=<name> - Compile a testbench with VCS"
 	@echo "  make vcs-run TB=<name>     - Compile and run a testbench with VCS"
+	@echo "  make vcs-regression        - Run all unit/integration tests with VCS"
 	@echo "  make vcs-gui TB=<name>     - Run the VCS executable in Verdi GUI mode"
 	@echo "  make verdi TB=<name>       - Open the compiled VCS design in Verdi"
 	@echo "  Default TB: tb_rv32i_pipeline"
@@ -192,6 +200,36 @@ vcs-run: vcs-compile
 	@echo "=========================================="
 	@$(VCS_SIMV) -l $(LOG_DIR)/vcs_$(VCS_TOP).log
 	@echo "VCS log: $(LOG_DIR)/vcs_$(VCS_TOP).log"
+
+# Run every RTL unit and integration test with VCS. Each test has a separate
+# executable because VCS elaboration is top-specific.
+vcs-regression:
+	@command -v $(VCS) >/dev/null 2>&1 || { echo "Error: VCS executable '$(VCS)' not found"; exit 1; }
+	@mkdir -p $(LOG_DIR)
+	@echo "=========================================="
+	@echo "Running VCS RTL Regression ($(words $(VCS_REGRESSION_TESTS)) tests)"
+	@echo "=========================================="
+	@passed=0; failed=0; failed_tests=""; \
+	for test in $(VCS_REGRESSION_TESTS); do \
+		echo "Running: $$test..."; \
+		driver_log="$(LOG_DIR)/vcs_driver_$$test.log"; \
+		if $(MAKE) --no-print-directory vcs-run TB=$$test > "$$driver_log" 2>&1 && \
+		   grep -Eq "ALL TESTS PASSED|TEST PASSED|CPU IS FUNCTIONALLY CORRECT|Test Status: PASSED" \
+		       "$(LOG_DIR)/vcs_$$test.log"; then \
+			echo "  ✓ PASSED"; \
+			passed=$$((passed + 1)); \
+		else \
+			echo "  ✗ FAILED (see $$driver_log)"; \
+			failed=$$((failed + 1)); \
+			failed_tests="$$failed_tests $$test"; \
+		fi; \
+	done; \
+	echo ""; \
+	echo "VCS regression: $$passed/$(words $(VCS_REGRESSION_TESTS)) passed"; \
+	if [ $$failed -ne 0 ]; then \
+		echo "Failed tests:$$failed_tests"; \
+		exit 1; \
+	fi
 
 # Start the simulation executable with the integrated Verdi GUI.
 vcs-gui: vcs-compile

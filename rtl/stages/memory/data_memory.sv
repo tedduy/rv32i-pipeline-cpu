@@ -24,10 +24,10 @@ module data_memory #(
       for (i = 0; i < BYTES; i++) mem[i] <= '0;
     end else if (i_we) begin
       // ghi theo byte-enable
-      if (i_wstrb[0]) mem[i_addr + 0] <= i_wdata[7:0];
-      if (i_wstrb[1]) mem[i_addr + 1] <= i_wdata[15:8];
-      if (i_wstrb[2]) mem[i_addr + 2] <= i_wdata[23:16];
-      if (i_wstrb[3]) mem[i_addr + 3] <= i_wdata[31:24];
+      if (i_wstrb[0]) mem[addr_a + 0] <= i_wdata[7:0];
+      if (i_wstrb[1]) mem[addr_a + 1] <= i_wdata[15:8];
+      if (i_wstrb[2]) mem[addr_a + 2] <= i_wdata[23:16];
+      if (i_wstrb[3]) mem[addr_a + 3] <= i_wdata[31:24];
     end
   end
 
