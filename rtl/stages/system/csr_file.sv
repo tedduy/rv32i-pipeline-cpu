@@ -1,5 +1,10 @@
 module csr_file #(
-    parameter N = 32
+    parameter N = 32,
+    parameter logic [N-1:0] MVENDOR_ID = '0,
+    parameter logic [N-1:0] MARCH_ID = '0,
+    parameter logic [N-1:0] MIMP_ID = '0,
+    parameter logic [N-1:0] HART_ID = '0,
+    parameter logic [N-1:0] CONFIG_PTR = '0
 )(
     input  logic             i_clk,
     input  logic             i_arst_n,
@@ -29,6 +34,7 @@ module csr_file #(
 );
 
     localparam logic [11:0] CSR_MSTATUS  = 12'h300;
+    localparam logic [11:0] CSR_MISA     = 12'h301;
     localparam logic [11:0] CSR_MIE      = 12'h304;
     localparam logic [11:0] CSR_MTVEC    = 12'h305;
     localparam logic [11:0] CSR_MSCRATCH = 12'h340;
@@ -40,6 +46,15 @@ module csr_file #(
     localparam logic [11:0] CSR_MINSTRET = 12'hB02;
     localparam logic [11:0] CSR_MCYCLEH  = 12'hB80;
     localparam logic [11:0] CSR_MINSTRETH = 12'hB82;
+    localparam logic [11:0] CSR_MVENDORID = 12'hF11;
+    localparam logic [11:0] CSR_MARCHID   = 12'hF12;
+    localparam logic [11:0] CSR_MIMPID    = 12'hF13;
+    localparam logic [11:0] CSR_MHARTID   = 12'hF14;
+    localparam logic [11:0] CSR_MCONFIGPTR = 12'hF15;
+
+    // RV32 (MXL=1) with the base integer extension I (bit 8). Zicsr is not
+    // represented in misa because only single-letter extensions appear there.
+    localparam logic [N-1:0] MISA_VALUE = 32'h4000_0100;
 
     logic             mstatus_mie;
     logic             mstatus_mpie;
@@ -83,6 +98,9 @@ module csr_file #(
         unique case (i_csr_addr)
             CSR_MSTATUS:   o_csr_rdata = {{(N-13){1'b0}}, 2'b11, 3'b000,
                                           mstatus_mpie, 3'b000, mstatus_mie, 3'b000};
+            // misa is at a read/write CSR address, but every implemented field
+            // is immutable in this core. Writes are legal and have no effect.
+            CSR_MISA:      o_csr_rdata = MISA_VALUE;
             CSR_MIE:       o_csr_rdata = mie;
             CSR_MTVEC:     o_csr_rdata = mtvec;
             CSR_MSCRATCH:  o_csr_rdata = mscratch;
@@ -91,12 +109,33 @@ module csr_file #(
             CSR_MTVAL:     o_csr_rdata = mtval;
             CSR_MIP: begin
                 o_csr_rdata = mip;
-                o_csr_writable = 1'b0;
+                // Pending bits are driven by pins. Writes remain legal because
+                // mip is not in the architecturally read-only CSR address range.
             end
             CSR_MCYCLE:    o_csr_rdata = mcycle[31:0];
             CSR_MINSTRET:  o_csr_rdata = minstret[31:0];
             CSR_MCYCLEH:   o_csr_rdata = mcycle[63:32];
             CSR_MINSTRETH: o_csr_rdata = minstret[63:32];
+            CSR_MVENDORID: begin
+                o_csr_rdata = MVENDOR_ID;
+                o_csr_writable = 1'b0;
+            end
+            CSR_MARCHID: begin
+                o_csr_rdata = MARCH_ID;
+                o_csr_writable = 1'b0;
+            end
+            CSR_MIMPID: begin
+                o_csr_rdata = MIMP_ID;
+                o_csr_writable = 1'b0;
+            end
+            CSR_MHARTID: begin
+                o_csr_rdata = HART_ID;
+                o_csr_writable = 1'b0;
+            end
+            CSR_MCONFIGPTR: begin
+                o_csr_rdata = CONFIG_PTR;
+                o_csr_writable = 1'b0;
+            end
             default: begin
                 o_csr_rdata = '0;
                 o_csr_valid = 1'b0;

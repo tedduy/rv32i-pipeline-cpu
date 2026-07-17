@@ -7,7 +7,12 @@
 module rv32i_top #(
     parameter N = 32,
     parameter REG_DEPTH = 32,
-    parameter logic [N-1:0] RESET_VECTOR = '0
+    parameter logic [N-1:0] RESET_VECTOR = '0,
+    parameter logic [N-1:0] MVENDOR_ID = '0,
+    parameter logic [N-1:0] MARCH_ID = '0,
+    parameter logic [N-1:0] MIMP_ID = '0,
+    parameter logic [N-1:0] HART_ID = '0,
+    parameter logic [N-1:0] CONFIG_PTR = '0
 )(
     input  logic i_clk,
     input  logic i_arst_n,
@@ -705,7 +710,14 @@ module rv32i_top #(
         end
     end
 
-    csr_file #(.N(N)) machine_csrs (
+    csr_file #(
+        .N         (N),
+        .MVENDOR_ID(MVENDOR_ID),
+        .MARCH_ID  (MARCH_ID),
+        .MIMP_ID   (MIMP_ID),
+        .HART_ID   (HART_ID),
+        .CONFIG_PTR(CONFIG_PTR)
+    ) machine_csrs (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_csr_addr(ex_csr_addr),

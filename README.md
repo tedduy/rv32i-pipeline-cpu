@@ -12,8 +12,10 @@ Thiết kế có data forwarding, load-use hazard detection và flush khi branch
 
 Core hỗ trợ các lệnh CSR của extension Zicsr, `ECALL`, `EBREAK` và `MRET` trong
 machine mode. Các CSR hiện có gồm `mstatus`, `mie`, `mtvec`, `mscratch`, `mepc`,
-`mcause`, `mtval`, `mip`, `mcycle` và `minstret`. Ba ngõ vào interrupt đồng bộ
-với clock hỗ trợ machine software, timer và external interrupt.
+`mcause`, `mtval`, `mip`, `mcycle`, `minstret`, `misa` và nhóm machine
+identification/configuration CSR. `mhartid` cùng các ID có thể cấu hình bằng
+tham số top-level. Ba ngõ vào interrupt đồng bộ với clock hỗ trợ machine
+software, timer và external interrupt.
 
 Illegal instruction, truy cập CSR không được hỗ trợ, địa chỉ load/store lệch
 alignment và target branch/jump lệch `IALIGN=32` đều tạo precise exception trước
@@ -113,6 +115,9 @@ make vcs TB=tb_machine_external_interrupt
 # Kiểm tra illegal instruction và misaligned access
 make vcs TB=tb_machine_exceptions
 
+# Kiểm tra misa và nhóm machine identification CSR
+make vcs TB=tb_machine_identification_csrs
+
 # Mở waveform của pipeline
 make wave TB=tb_rv32i_pipeline
 
@@ -144,9 +149,8 @@ Hai file list được dùng là:
 ## Architectural compliance (ACT4)
 
 Thư mục [`compliance/act4/`](compliance/act4/) chứa cấu hình cho flow ACT4 chính
-thức. Profile hiện tại chỉ bật extension `I`; `Zicsr` và machine-mode chưa được
-khai báo compliance cho đến khi core có đủ các CSR bắt buộc như `misa` và nhóm
-machine identification CSR.
+thức. Profile hiện tại kiểm tra `I` và `Zicsr`; machine-mode `Sm` được khai báo
+làm architectural context nhưng bộ test privileged đầy đủ chưa được bật.
 
 Môi trường local nằm trong `.tools/act4/` và không được đưa vào Git. Nó không
 sửa `PATH`, `.bashrc` hay package hệ thống. Kiểm tra installation bằng:
@@ -162,6 +166,9 @@ make act-run ELF=/path/to/test.elf
 
 # Chạy toàn bộ ELF vừa sinh
 make act-regression
+
+# Chỉ chạy sáu ELF Zicsr
+make act-zicsr
 ```
 
 Có thể override `ACT_ROOT`, `ACT_TOOL_ROOT` hoặc `ACT_ELF_DIR` nếu muốn dùng

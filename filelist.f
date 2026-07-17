@@ -50,6 +50,7 @@ tb/integration/tb_commit_interface.sv
 tb/integration/tb_machine_csr_trap.sv
 tb/integration/tb_machine_external_interrupt.sv
 tb/integration/tb_machine_exceptions.sv
+tb/integration/tb_machine_identification_csrs.sv
 tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv
