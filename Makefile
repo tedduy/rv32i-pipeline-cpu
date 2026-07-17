@@ -2,7 +2,7 @@
 # Makefile for RV32I Pipeline CPU - QuestaSim
 # ==============================================================================
 
-.PHONY: help all clean compile run unit pipeline verify gl gl-compile gl-clean
+.PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -30,21 +30,19 @@ VSIM_FLAGS = -c -work $(WORK_DIR)
 VSIM_GL_FLAGS = -c -suppress 12110 -work $(WORK_GL_DIR)
 
 # File lists
-COMPILE_LIST = compile.f
+RTL_FILELIST = filelist.f
+GL_FILELIST = filelist_netlist.f
 
-# Gate-level paths
-RUN_DIR = openlane
-GL_NETLIST = $(RUN_DIR)/rv32i_top.v
-GL_SDF = $(RUN_DIR)/rv32i_top.sdf
-PDK_ROOT = /home/buuduy/.ciel/ciel/sky130/versions/0fe599b2afb6708d281543108caf8310912f54af
+# Sky130 PDK used only by gate-level simulation
+PDK_ROOT ?=
 SKY130_PRIMITIVES = $(PDK_ROOT)/sky130B/libs.ref/sky130_fd_sc_hd/verilog/primitives.v
 SKY130_LIB = $(PDK_ROOT)/sky130B/libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v
-TB_GL = tb/tb_rv32i_gl.sv
+PIPELINE_WAVE = wave_tb_rv32i_pipeline.do
 
 # Unit test list
-UNIT_TESTS = tb_alu_unit tb_reg_file tb_imm_gen tb_branch_unit \
+UNIT_TESTS = tb_alu_unit tb_register_file tb_immediate_generator tb_branch_unit \
              tb_jump_unit tb_load_store_unit tb_control_unit tb_program_counter \
-             tb_instruction_mem tb_data_memory
+             tb_instruction_memory tb_data_memory
 
 # ==============================================================================
 # Help
@@ -56,17 +54,19 @@ help:
 	@echo "=========================================="
 	@echo ""
 	@echo "RTL Simulation Commands:"
-	@echo "  make compile          - Compile all RTL and testbench"
+	@echo "  make compile          - Compile RTL and testbenches"
+	@echo "  make rtl-compile      - Compile RTL and testbenches"
 	@echo "  make run TB=<name>    - Run specific testbench"
-	@echo "  make wave TB=<name>   - Run with waveform viewer (GUI)"
+	@echo "  make wave TB=<name>   - Open an RTL testbench in the waveform viewer"
 	@echo "  make unit             - Run all unit tests (10 tests)"
 	@echo "  make pipeline         - Run pipeline integration test"
-	@echo "  make verify           - Run Write back data test (Optinal)"
+	@echo "  make verify           - Run write-back verification"
 	@echo "  make all              - Compile + run all tests"
 	@echo ""
 	@echo "Gate-Level Simulation Commands:"
+	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
 	@echo "  make gl               - Run gate-level simulation"
-	@echo "  make wave TB=tb_rv32i_gl - Run gate-level with GUI"
+	@echo "  make wave-gl          - Open gate-level simulation with GUI"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make clean            - Clean all generated files"
@@ -79,9 +79,9 @@ help:
 	@echo "  make gl                           - Run gate-level sim"
 	@echo ""
 	@echo "Unit Tests Available:"
-	@echo "  tb_alu_unit, tb_reg_file, tb_imm_gen, tb_branch_unit"
+	@echo "  tb_alu_unit, tb_register_file, tb_immediate_generator, tb_branch_unit"
 	@echo "  tb_jump_unit, tb_load_store_unit, tb_control_unit, tb_program_counter"
-	@echo "  tb_instruction_mem, tb_data_memory"
+	@echo "  tb_instruction_memory, tb_data_memory"
 	@echo ""
 	@echo "Integration Tests:"
 	@echo "  tb_rv32i_pipeline"
@@ -95,32 +95,40 @@ help:
 # Main Targets
 # ==============================================================================
 
-# Compile all RTL and testbench (including gate-level)
-compile:
+# Compile RTL and testbenches. Keep `compile` as the friendly default alias.
+compile: rtl-compile
+
+rtl-compile:
 	@echo "=========================================="
 	@echo "Compiling RTL and Testbench..."
 	@echo "=========================================="
 	@if [ ! -d $(WORK_DIR) ]; then $(VLIB) $(WORK_DIR); fi
-	@$(VLOG) $(VLOG_FLAGS) -f $(COMPILE_LIST)
+	@$(VLOG) $(VLOG_FLAGS) -f $(RTL_FILELIST)
 	@echo ""
 	@echo "✓ RTL Compilation complete!"
-	@echo ""
-	@echo "Compiling Gate-Level Netlist (Run 3)..."
+	@echo "=========================================="
+
+# Compile the generated Sky130 netlist independently from RTL.
+gl-compile:
+	@if [ -z "$(PDK_ROOT)" ]; then \
+		echo "Error: set PDK_ROOT to your Sky130 PDK installation"; \
+		exit 1; \
+	fi
+	@echo "=========================================="
+	@echo "Compiling Gate-Level Netlist..."
 	@if [ ! -d $(WORK_GL_DIR) ]; then $(VLIB) $(WORK_GL_DIR); fi
-	@echo "[1/3] Compiling Sky130 PDK..."
+	@echo "[1/2] Compiling Sky130 PDK..."
 	@$(VLOG) $(VLOG_GL_FLAGS) -suppress 2892 +define+USE_POWER_PINS \
 		"$(SKY130_PRIMITIVES)" \
 		"$(SKY130_LIB)" > /dev/null 2>&1 || (echo "Error compiling Sky130 PDK"; exit 1)
-	@echo "[2/3] Compiling Gate-Level Netlist..."
+	@echo "[2/2] Compiling Gate-Level Netlist and Testbench..."
 	@$(VLOG) $(VLOG_GL_FLAGS) -suppress 2892 +define+USE_POWER_PINS \
-		"$(GL_NETLIST)" > /dev/null 2>&1 || (echo "Error compiling gate-level netlist"; exit 1)
-	@echo "[3/3] Compiling Testbench..."
-	@$(VLOG) $(VLOG_GL_FLAGS) "$(TB_GL)" > /dev/null 2>&1 || (echo "Error compiling testbench"; exit 1)
+		-f "$(GL_FILELIST)" > /dev/null 2>&1 || (echo "Error compiling gate-level design"; exit 1)
 	@echo "✓ Gate-level compilation complete!"
 	@echo "=========================================="
 
 # Run specific testbench
-run: compile
+run: rtl-compile
 	@if [ -z "$(TB)" ]; then \
 		echo "Error: Please specify TB=<testbench_name>"; \
 		echo "Example: make run TB=tb_alu_unit"; \
@@ -136,29 +144,29 @@ run: compile
 	@echo "✓ Log saved: $(LOG_DIR)/$(TB).log"
 	@echo "=========================================="
 
-# Run with waveform viewer
-wave:
+# Run an RTL testbench with the waveform viewer
+wave: rtl-compile
 	@if [ -z "$(TB)" ]; then \
 		echo "Error: Please specify TB=<testbench_name>"; \
 		echo "Example: make wave TB=tb_alu_unit"; \
-		echo "Example: make wave TB=tb_rv32i_gl (for gate-level)"; \
 		exit 1; \
 	fi
 	@echo "=========================================="
 	@echo "Running with GUI: $(TB)"
 	@echo "=========================================="
-	@if [ ! -d $(WORK_DIR) ]; then \
-		echo "Compiling first..."; \
-		$(MAKE) compile; \
-	fi
-	@if [ "$(TB)" = "tb_rv32i_pipeline" ] && [ -f wave_$(TB).do ]; then \
-		$(SIM) -gui $(WORK_DIR).$(TB) -do wave_$(TB).do; \
+	@if [ "$(TB)" = "tb_rv32i_pipeline" ] && [ -f $(PIPELINE_WAVE) ]; then \
+		$(SIM) -gui $(WORK_DIR).$(TB) -do $(PIPELINE_WAVE); \
 	else \
 		$(SIM) -gui $(WORK_DIR).$(TB) -do "add wave -r /*; run -all"; \
 	fi
 
+# Run the synthesized Sky130 design with the waveform viewer
+wave-gl: gl-compile
+	@$(SIM) -gui -work $(WORK_GL_DIR) $(WORK_GL_DIR).tb_rv32i_gl \
+		-do "add wave -r /*; run -all"
+
 # Run all unit tests (clean output)
-unit: compile
+unit: rtl-compile
 	@mkdir -p $(LOG_DIR)
 	@echo "=========================================="
 	@echo "Running All Unit Tests (10 tests)"
@@ -187,7 +195,7 @@ unit: compile
 	echo "=========================================="
 
 # Run pipeline integration test (clean output)
-pipeline: compile
+pipeline: rtl-compile
 	@mkdir -p $(LOG_DIR)
 	@echo "=========================================="
 	@echo "Running Pipeline Integration Test"
@@ -205,7 +213,7 @@ pipeline: compile
 	@echo "=========================================="
 
 # Run full verification test (clean output)
-verify: compile
+verify: rtl-compile
 	@mkdir -p $(LOG_DIR)
 	@echo "=========================================="
 	@echo "Running Full Verification Test"
@@ -229,7 +237,7 @@ verify: compile
 	@echo "=========================================="
 
 # Compile and run all tests
-all: compile
+all: rtl-compile
 	@mkdir -p $(LOG_DIR)
 	@echo "=========================================="
 	@echo "Running All Tests"
@@ -287,11 +295,7 @@ all: compile
 # ==============================================================================
 
 # Run gate-level simulation (command-line)
-gl:
-	@if [ ! -d $(WORK_GL_DIR) ]; then \
-		echo "Work directory not found. Running compile first..."; \
-		$(MAKE) compile; \
-	fi
+gl: gl-compile
 	@mkdir -p $(LOG_DIR)
 	@echo ""
 	@echo "=========================================="

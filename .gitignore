@@ -1,129 +1,75 @@
-# ============================================================
-# RV32I CPU Project - Git Ignore
-# ============================================================
-
-# Keep source files and documentation
-!rtl/
-!tb/
-!docs/
-!sim/scripts/
-!README.md
-!Makefile
-!.gitignore
-
-
-# Keep all SystemVerilog files
-!**/*.sv
-!**/*.svh
-
-# Keep all documentation
-!**/*.md
-
-# Keep simulation scripts
-!sim/scripts/*.sh
-!sim/scripts/*.f
-!sim/scripts/*.tcl
-/.vscode/
-/logs/
-/work/
-/work_gl/
-/rtl_work/
-transcript
-/thesis/
-**/*.tex
-*.md.backup
-*.vcd
-*.vstf
-wlftDHkmz7
-# ============================================================
-# FPGA - Quartus Generated Files (Keep source, ignore build)
-# ============================================================
-# Keep FPGA source files
-!fpga/
-!fpga/*.sv
-!fpga/*.sdc
-!fpga/*.tcl
-!fpga/*.md
-
-# Ignore Quartus generated folders
-fpga/db/
-fpga/incremental_db/
-fpga/output_files/
-fpga/simulation/
-fpga/.qsys_edit/
-fpga/c5_pin_model_dump.txt
-fpga/greybox_tmp/
-fpga/hc_output/
-fpga/reconfig_mif/
-fpga/timing/
-fpga/*.qsf
-fpga/*.qpf
-fpga/*.rpt
-fpga/*.summary
-fpga/*.smsg
-fpga/*.done
-fpga/*.qws
-fpga/*.sld
-fpga/*.jdi
-fpga/*.pin
-fpga/*.sof
-fpga/*.pof
-fpga/*.jic
-#/docs/
-# ============================================================
-# Ignore all build artifacts and generated files
-# ============================================================
-*.log
-*.jou
-*.rpt
-*.txt~
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
 *.swp
 *.bak
 *.orig
-*.tmp
-*.vcd
+*~
+
+# Local environment
+.env
+.cache/
+__pycache__/
+*.pyc
+
+# QuestaSim / ModelSim
+work/
+work_gl/
+rtl_work/
+logs/
+transcript
+modelsim.ini
 *.wlf
-*.sdf
-*.smsg
+*.vcd
+*.vstf
+*.ucdb
 *.mti
-*.ini
 *.tcl.history
-*.dat
-*.csv
-*.out
-*.map
-*.elf
-*.pdf
-*.sdc
+
+# Other simulator artifacts
+*.fsdb
+*.shm
+*.vpd
+*.jou
+
+# Quartus generated directories
+implementation/fpga/**/db/
+implementation/fpga/**/incremental_db/
+implementation/fpga/**/output_files/
+implementation/fpga/**/simulation/
+implementation/fpga/**/.qsys_edit/
+implementation/fpga/**/greybox_tmp/
+implementation/fpga/**/hc_output/
+implementation/fpga/**/reconfig_mif/
+implementation/fpga/**/timing/
+
+# Quartus generated reports and programming files
+*.rpt
+*.summary
+*.smsg
+*.done
+*.qws
+*.sld
+*.jdi
+*.pin
 *.sof
 *.pof
 *.jic
-*.hex
-*.rpd
-*.qws
-*.db
-*.ddb
-*.cmp
-*.pin
-*.qmsg
-*.eqn
 *.qar
-*.key
-*.log.*
-*.fsdb
-*.shm
-*.svf
 
-*.bak
-*.vpd
-*.DS_Store
-*.pyc
-__pycache__/
-.idea/
-.vscode/
-.cache/
-.env/
-work/
+# Generic build outputs
 build/
-fpga/rv32i_top.qsf
+*.log
+*.tmp
+*.out
+*.map
+*.elf
+
+# Local notes and generated documents
+thesis/
+*.md.backup
+*.txt~
+*.pdf
+
 Makefile.backup

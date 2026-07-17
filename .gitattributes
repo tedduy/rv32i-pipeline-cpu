@@ -4,6 +4,11 @@
 # TCL scripts should always use LF (for cross-platform compatibility)
 *.tcl text eol=lf
 *.sh text eol=lf
+*.f text eol=lf
+*.do text eol=lf
+*.qsf text eol=lf
+*.qpf text eol=lf
+*.stp text eol=lf
 
 # Windows batch files should use CRLF
 *.bat text eol=crlf

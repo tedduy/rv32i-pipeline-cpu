@@ -1,169 +1,117 @@
 # RV32I 5-Stage Pipeline CPU
 
-![Status](https://img.shields.io/badge/Status-Verified-success)
-![ISA](https://img.shields.io/badge/ISA-RV32I-blue)
-![FPGA](https://img.shields.io/badge/FPGA-DE2--115-orange)
+CPU RISC-V 32-bit triển khai bằng SystemVerilog, sử dụng pipeline 5 tầng:
 
-## Tổng quan
-
-Bộ vi xử lý **RISC-V 32-bit (RV32I)** theo kiến trúc **5-stage pipeline** (IF, ID, EX, MEM, WB) bằng **SystemVerilog**.
-
-**Tính năng:**
-- ✅ Hỗ trợ đầy đủ 37 instructions RV32I
-- ✅ Data Forwarding (Data Bypassing)
-- ✅ Hazard Detection & Pipeline Stall
-- ✅ Branch/Jump Flushing
-- ✅ CPI = 1.12, IPC = 0.89 (hiệu suất 89%)
-- ✅ 100% kiểm chứng thành công (51/51 test cases)
-- ✅ Triển khai thành công trên FPGA DE2-115
-
----
-
-## Kiến trúc Pipeline
-
-```
-┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐
-│ IF  │ -> │ ID  │ -> │ EX  │ -> │ MEM │ -> │ WB  │
-└─────┘    └─────┘    └─────┘    └─────┘    └─────┘
+```text
+IF → ID → EX → MEM → WB
 ```
 
-**5 Stages:**
-1. **IF**: Instruction Fetch (PC + Instruction Memory)
-2. **ID**: Instruction Decode (Control Unit + Register File + Immediate Gen)
-3. **EX**: Execute (ALU + Branch + Jump + Forwarding Unit)
-4. **MEM**: Memory Access (Data Memory + Load/Store Unit)
-5. **WB**: Write Back (ghi kết quả về Register File)
+Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Repo đồng thời chứa unit test, integration test, wrapper FPGA DE2-115 và netlist Sky130.
 
-**Hazard Handling:**
-- Data Forwarding Unit: giải quyết RAW hazards
-- Hazard Detection Unit: phát hiện Load-Use hazards
-- Pipeline Flushing: xử lý Branch/Jump
+## Bắt đầu đọc từ đâu?
 
----
+Đọc theo thứ tự sau để hiểu thiết kế nhanh nhất:
 
-## Cấu trúc Dự án
+1. [`rtl/rv32i_top.sv`](rtl/rv32i_top.sv) — kết nối toàn bộ datapath và control path.
+2. [`rtl/pipeline/`](rtl/pipeline/) — bốn ranh giới của pipeline.
+3. [`rtl/stages/decode/control_unit.sv`](rtl/stages/decode/control_unit.sv) — giải mã instruction.
+4. [`rtl/stages/execute/alu_unit.sv`](rtl/stages/execute/alu_unit.sv) — datapath thực thi.
+5. [`rtl/hazard/`](rtl/hazard/) — stall, flush và forwarding.
+6. [`tb/integration/tb_rv32i_pipeline.sv`](tb/integration/tb_rv32i_pipeline.sv) — luồng kiểm thử toàn CPU.
 
-```
+## Cấu trúc repo
+
+```text
 rv32i-pipeline-cpu/
-├── fpga/                    # FPGA Set Up
-├── rtl/                    # RTL Source Code
-│   ├── top/                # rv32i_top.sv
-│   ├── core/
-│   │   ├── stages/         # ALU, Control, RegFile, Memory...
-│   │   ├── pipeline/       # IF_ID, ID_EX, EX_MEM, MEM_WB
-│   │   └── hazard/         # Forwarding, Hazard Detection
-│   └── common/             # Adder, Mux
-├── tb/                     # Testbenches
-│   ├── unit_test/          # 10 unit tests
-│   └── tb_rv32i_gl.sv            # Gate-level testbench
-│   └── tb_rv32i_pipeline.sv      # System testbench
-├── openlane/               # OpenLane ASIC Synthesis
-│   ├── rv32i_top.v         # Gate-level netlist
-│   └── rv32i_top.sdf       # Timing annotation
-├── docs/                   # Documentation
-└── Makefile                # Build automation
+├── rtl/
+│   ├── rv32i_top.sv
+│   ├── stages/
+│   │   ├── fetch/            # IF: PC và instruction memory
+│   │   ├── decode/           # ID: control, immediate, register file
+│   │   ├── execute/          # EX: ALU, branch và jump
+│   │   └── memory/           # MEM: load/store và data memory
+│   ├── pipeline/             # IF/ID, ID/EX, EX/MEM, MEM/WB
+│   ├── hazard/               # Forwarding và hazard detection
+│   └── common/               # Adder và mux dùng chung
+├── tb/
+│   ├── unit/
+│   ├── integration/
+│   └── gate_level/
+├── implementation/
+│   ├── fpga/de2_115/
+│   └── asic/sky130/netlist/
+├── docs/
+├── filelist.f
+├── filelist_netlist.f
+├── wave_tb_rv32i_pipeline.do
+└── Makefile
 ```
 
----
+## Quy ước đặt tên
 
-## Hướng dẫn Sử dụng
+- Một module SystemVerilog chính trên mỗi file.
+- Tên file trùng tên module và dùng `lower_snake_case`.
+- Testbench dùng tiền tố `tb_`.
+- Tín hiệu stage dùng tiền tố `if_`, `id_`, `ex_`, `mem_`, `wb_`.
+- `rv32i_top` được giữ ổn định làm entry point cho RTL, FPGA và ASIC.
 
-### Yêu cầu
-- QuestaSim/ModelSim (SystemVerilog simulator)
-- Intel Quartus Prime (cho FPGA)
-- Make, Bash
+## Chạy simulation
 
-### Quick Start
+Yêu cầu:
+
+- QuestaSim hoặc ModelSim (`vlib`, `vlog`, `vsim`).
+- GNU Make.
 
 ```bash
-# Clone project
-git clone https://github.com/tedduy/rv32i-pipeline-cpu
-cd rv32i-pipeline-cpu
+# Compile RTL và toàn bộ RTL testbench
+make rtl-compile
 
-# Compile all (RTL + Gate-level)
-make compile
-
-# Run RTL simulation
-make pipeline
-
-# Run unit tests
+# Chạy 10 unit testbench
 make unit
 
-# Run gate-level simulation
-make gl
+# Chạy pipeline integration test
+make pipeline
 
-# View waveform
+# Chạy write-back verification
+make verify
+
+# Mở waveform của pipeline
 make wave TB=tb_rv32i_pipeline
 
-# Clean
+# Xóa simulation artifacts
 make clean
-
-# Help
-make help
 ```
 
----
+`make compile` là alias của `make rtl-compile`; gate-level không còn bị compile bắt buộc cùng RTL.
 
-## Kết quả Kiểm chứng
+## Gate-level simulation
 
-**Simulation Results:**
-```
-Memory Layout:       77 entries (index 0-76, addresses 0x00-0x130)
-Executed Instructions: 76 (excluding initialization NOP at index 0)
-Total Cycles:        84 (RTL) / 86 (Gate-level)
-CPI:                 1.11 (RTL) / 1.13 (Gate-level)
-IPC:                 0.90 (RTL) / 0.88 (Gate-level)
-Test Cases:          76/76 PASSED ✓
+Netlist được lưu tại:
+
+```text
+implementation/asic/sky130/netlist/rv32i_top.v
 ```
 
-**Note:** Index 0 (address 0x00) contains initialization NOP, not counted in metrics.
-
-**Performance:**
-| Metric | RTL Value | Gate-Level | Ideal | Efficiency |
-|--------|-----------|------------|-------|------------|
-| CPI | 1.11 | 1.13 | 1.00 | 90.09% / 88.5% |
-| IPC | 0.90 | 0.88 | 1.00 | 90.0% / 88.0% |
-
-**Test Coverage:**
-- ✅ **76 instructions executed successfully** (77 memory entries, excluding initial NOP at 0x00)
-- ✅ **37 unique RV32I instruction types** fully covered
-- ✅ Instruction breakdown: R-Type (20), I-Type (20), Load (10), Store (6), Branch (12), Jump (5), U-Type (4)
-- ✅ Data forwarding verified (0 stall cycles)
-- ✅ Hazard detection verified (5 flush cycles)
-- ✅ Branch/Jump flushing verified
-
-Chi tiết: [`docs/VERIFICATION_REPORT.md`](docs/VERIFICATION_REPORT.md)
-
----
-
-## Gate-Level Simulation
+Gate-level simulation cần Sky130 PDK:
 
 ```bash
-# Compile RTL + Gate-level netlist
-make compile
-
-# Run gate-level simulation
-make gl
-
-# View detailed log
-cat logs/gl_simulation.log
+make gl PDK_ROOT=/path/to/sky130/pdk
 ```
 
-**Gate-Level Results:**
-- ✅ 76/76 tests PASSED
-- ✅ Synthesized with OpenLane (Sky130 PDK)
-- ✅ Area: 0.81 mm², Frequency: 50 MHz
-- ✅ Timing verified with SDF annotation
+Hai file list được dùng là:
 
----
+- [`filelist.f`](filelist.f) — RTL và testbench.
+- [`filelist_netlist.f`](filelist_netlist.f) — Sky130 netlist và gate-level testbench.
 
-## Documentation
+## FPGA
 
-**RISC-V References:**
-- [RISC-V ISA Specification](https://riscv.org/technical/specifications/)
-- [RISC-V User Manual](https://five-embeddev.com/riscv-user-isa-manual/)
-- [OpenLane Documentation](https://openlane.readthedocs.io/)
+Wrapper và Quartus project DE2-115 nằm tại [`implementation/fpga/de2_115/`](implementation/fpga/de2_115/).
 
----
+Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
 
-**© 2025 RV32I Pipeline CPU Project**
+## Tài liệu kết quả
+
+- [`docs/verification_report.md`](docs/verification_report.md)
+- [`docs/performance_analysis.md`](docs/performance_analysis.md)
+
+Các báo cáo trên ghi lại kết quả của phiên bản trước refactor. Cần chạy lại simulation trên máy có QuestaSim trước khi phát hành tag mới.
