@@ -149,7 +149,7 @@ After compilation, update these files:
 
 - [ ] Fill in this file (`compilation_results.md`)
 - [ ] Update README.md with actual Fmax
-- [ ] Update implementation/fpga/de2_115/README.md with resource usage
+- [ ] Update fpga/de2_115/README.md with resource usage
 - [ ] Take screenshots for report
 - [ ] Note any timing violations (if any)
 

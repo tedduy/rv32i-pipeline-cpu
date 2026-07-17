@@ -34,15 +34,15 @@ modelsim.ini
 *.jou
 
 # Quartus generated directories
-implementation/fpga/**/db/
-implementation/fpga/**/incremental_db/
-implementation/fpga/**/output_files/
-implementation/fpga/**/simulation/
-implementation/fpga/**/.qsys_edit/
-implementation/fpga/**/greybox_tmp/
-implementation/fpga/**/hc_output/
-implementation/fpga/**/reconfig_mif/
-implementation/fpga/**/timing/
+fpga/**/db/
+fpga/**/incremental_db/
+fpga/**/output_files/
+fpga/**/simulation/
+fpga/**/.qsys_edit/
+fpga/**/greybox_tmp/
+fpga/**/hc_output/
+fpga/**/reconfig_mif/
+fpga/**/timing/
 
 # Quartus generated reports and programming files
 *.rpt

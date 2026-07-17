@@ -37,9 +37,10 @@ rv32i-pipeline-cpu/
 │   ├── unit/
 │   ├── integration/
 │   └── gate_level/
-├── implementation/
-│   ├── fpga/de2_115/
-│   └── asic/sky130/netlist/
+├── fpga/
+│   └── de2_115/
+├── asic/
+│   └── sky130/netlist/
 ├── docs/
 ├── filelist.f
 ├── filelist_netlist.f
@@ -89,7 +90,7 @@ make clean
 Netlist được lưu tại:
 
 ```text
-implementation/asic/sky130/netlist/rv32i_top.v
+asic/sky130/netlist/rv32i_top.v
 ```
 
 Gate-level simulation cần Sky130 PDK:
@@ -105,7 +106,7 @@ Hai file list được dùng là:
 
 ## FPGA
 
-Wrapper và Quartus project DE2-115 nằm tại [`implementation/fpga/de2_115/`](implementation/fpga/de2_115/).
+Wrapper và Quartus project DE2-115 nằm tại [`fpga/de2_115/`](fpga/de2_115/).
 
 Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
 
