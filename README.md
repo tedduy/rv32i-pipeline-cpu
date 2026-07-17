@@ -6,7 +6,7 @@ CPU RISC-V 32-bit triển khai bằng SystemVerilog, sử dụng pipeline 5 tầ
 IF → ID → EX → MEM → WB
 ```
 
-Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Instruction memory nằm ngoài CPU và kết nối qua cặp tín hiệu `o_imem_addr`/`i_imem_rdata`, giúp core có thể tích hợp với ROM hoặc Flash của MCU. Repo đồng thời chứa unit test, integration test, wrapper FPGA DE2-115 và netlist Sky130.
+Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Instruction memory và data memory nằm ngoài CPU; core xuất hai giao tiếp zero-wait-state để tích hợp với ROM, Flash, SRAM hoặc interconnect của MCU. Repo đồng thời chứa unit test, integration test, wrapper FPGA DE2-115 và netlist Sky130.
 
 ## Bắt đầu đọc từ đâu?
 
@@ -29,7 +29,7 @@ rv32i-pipeline-cpu/
 │   │   ├── fetch/            # IF: PC và model instruction memory bên ngoài core
 │   │   ├── decode/           # ID: control, immediate, register file
 │   │   ├── execute/          # EX: ALU, branch và jump
-│   │   └── memory/           # MEM: load/store và data memory
+│   │   └── memory/           # MEM: load/store và model data memory bên ngoài core
 │   ├── pipeline/             # IF/ID, ID/EX, EX/MEM, MEM/WB
 │   ├── hazard/               # Forwarding và hazard detection
 │   └── common/               # Adder và mux dùng chung

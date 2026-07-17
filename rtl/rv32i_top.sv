@@ -6,7 +6,6 @@
 
 module rv32i_top #(
     parameter N = 32,
-    parameter DMEM_BYTES = 256,
     parameter REG_DEPTH = 32
 )(
     input  logic i_clk,
@@ -15,6 +14,14 @@ module rv32i_top #(
     // External instruction memory interface (zero-wait-state)
     output logic [N-1:0] o_imem_addr,
     input  logic [N-1:0] i_imem_rdata,
+
+    // External data memory interface (zero-wait-state)
+    output logic         o_dmem_read,
+    output logic         o_dmem_write,
+    output logic [N-1:0] o_dmem_addr,
+    output logic [N-1:0] o_dmem_wdata,
+    output logic [3:0]   o_dmem_wstrb,
+    input  logic [N-1:0] i_dmem_rdata,
     
     // Debug/Test outputs
     output logic [N-1:0] W_PC_out,
@@ -117,7 +124,6 @@ module rv32i_top #(
     // ==========================================================================
     // MEM Stage Signals
     // ==========================================================================
-    logic [N-1:0] mem_read_data;
     logic [N-1:0] mem_load_data, mem_store_data;
     logic [3:0]   mem_byte_enable;
     
@@ -208,6 +214,12 @@ module rv32i_top #(
     assign W_mem_addr     = mem_alu_result;
     assign W_mem_wdata    = mem_store_data;
     assign W_mem_rdata    = mem_load_data;
+
+    assign o_dmem_read    = mem_mem_read;
+    assign o_dmem_write   = mem_mem_write;
+    assign o_dmem_addr    = mem_alu_result;
+    assign o_dmem_wdata   = mem_store_data;
+    assign o_dmem_wstrb   = mem_byte_enable;
     assign W_stall        = stall_if_id;
     assign W_flush        = flush_id_ex | flush_if_id;
     assign W_immediate    = wb_immediate;
@@ -538,26 +550,11 @@ module rv32i_top #(
         .i_mem_read(mem_mem_read),
         .i_mem_write(mem_mem_write),
         .i_byte_offset(mem_alu_result[1:0]),
-        .i_mem_read_data(mem_read_data),
+        .i_mem_read_data(i_dmem_rdata),
         .i_store_data(mem_rs2_data),
         .o_load_data(mem_load_data),
         .o_store_data(mem_store_data),
         .o_byte_enable(mem_byte_enable)
-    );
-    
-    // Data Memory
-    data_memory #(
-        .N(N),
-        .BYTES(DMEM_BYTES)
-    ) mem_dmem (
-        .i_clk(i_clk),
-        .i_arst_n(i_arst_n),
-        .i_we(mem_mem_write),
-        .i_re(mem_mem_read),
-        .i_addr(mem_alu_result),
-        .i_wdata(mem_store_data),
-        .i_wstrb(mem_byte_enable),
-        .o_rdata(mem_read_data)
     );
     
     // ==========================================================================
