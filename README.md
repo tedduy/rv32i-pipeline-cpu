@@ -6,7 +6,7 @@ CPU RISC-V 32-bit triển khai bằng SystemVerilog, sử dụng pipeline 5 tầ
 IF → ID → EX → MEM → WB
 ```
 
-Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Instruction memory và data memory nằm ngoài CPU; core xuất hai giao tiếp zero-wait-state để tích hợp với ROM, Flash, SRAM hoặc interconnect của MCU. Repo đồng thời chứa unit test, integration test, wrapper FPGA DE2-115 và netlist Sky130.
+Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Instruction memory và data memory nằm ngoài CPU; hai giao tiếp dùng handshake `valid`/`ready` để core có thể chờ ROM, Flash, SRAM hoặc interconnect của MCU. Repo đồng thời chứa unit test, integration test, wrapper FPGA DE2-115 và netlist Sky130.
 
 ## Bắt đầu đọc từ đâu?
 

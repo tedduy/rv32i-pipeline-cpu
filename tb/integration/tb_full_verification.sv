@@ -21,6 +21,8 @@ module tb_full_verification #(
     logic         W_reg_write;
     logic [N-1:0] imem_addr;
     logic [N-1:0] imem_rdata;
+    logic         imem_valid, imem_ready;
+    logic         dmem_valid, dmem_ready;
     logic         dmem_read, dmem_write;
     logic [N-1:0] dmem_addr, dmem_wdata, dmem_rdata;
     logic [3:0]   dmem_wstrb;
@@ -39,12 +41,16 @@ module tb_full_verification #(
         .i_arst_n    (~rst),
         .o_imem_addr (imem_addr),
         .i_imem_rdata(imem_rdata),
+        .o_imem_valid(imem_valid),
+        .i_imem_ready(imem_ready),
+        .o_dmem_valid(dmem_valid),
         .o_dmem_read (dmem_read),
         .o_dmem_write(dmem_write),
         .o_dmem_addr (dmem_addr),
         .o_dmem_wdata(dmem_wdata),
         .o_dmem_wstrb(dmem_wstrb),
         .i_dmem_rdata(dmem_rdata),
+        .i_dmem_ready(dmem_ready),
         .W_PC_out    (W_PC_out),
         .instruction (instruction),
         .W_RD1       (),
@@ -65,6 +71,9 @@ module tb_full_verification #(
         .W_flush     ()
     );
 
+    assign imem_ready = 1'b1;
+    assign dmem_ready = 1'b1;
+
     instruction_memory #(
         .N(N),
         .DEPTH(77)
@@ -81,8 +90,8 @@ module tb_full_verification #(
     ) dmem (
         .i_clk   (clk),
         .i_arst_n(~rst),
-        .i_we    (dmem_write),
-        .i_re    (dmem_read),
+        .i_we    (dmem_valid && dmem_write && dmem_ready),
+        .i_re    (dmem_valid && dmem_read),
         .i_addr  (dmem_addr),
         .i_wdata (dmem_wdata),
         .i_wstrb (dmem_wstrb),

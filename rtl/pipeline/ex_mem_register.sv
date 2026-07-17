@@ -9,6 +9,7 @@ module ex_mem_register #(
 )(
     input  logic             i_clk,
     input  logic             i_arst_n,
+    input  logic             i_stall,
     input  logic             i_flush,
     
     // Inputs from EX stage
@@ -74,6 +75,9 @@ module ex_mem_register #(
             // UPDATE: Reset JAL/JALR
             o_jal              <= 1'b0;
             o_jalr             <= 1'b0;
+        end
+        else if (i_stall) begin
+            // Keep the memory request stable until ready is asserted.
         end
         else if (i_flush) begin
             // Flush logic

@@ -11,6 +11,8 @@ module tb_load_use_hazard;
     logic        arst_n;
     logic [31:0] imem_addr;
     logic [31:0] imem_rdata;
+    logic        imem_valid, imem_ready;
+    logic        dmem_valid, dmem_ready;
     logic        dmem_read, dmem_write;
     logic [31:0] dmem_addr, dmem_wdata, dmem_rdata;
     logic [3:0]  dmem_wstrb;
@@ -22,14 +24,21 @@ module tb_load_use_hazard;
         .i_arst_n      (arst_n),
         .o_imem_addr   (imem_addr),
         .i_imem_rdata  (imem_rdata),
+        .o_imem_valid  (imem_valid),
+        .i_imem_ready  (imem_ready),
+        .o_dmem_valid  (dmem_valid),
         .o_dmem_read   (dmem_read),
         .o_dmem_write  (dmem_write),
         .o_dmem_addr   (dmem_addr),
         .o_dmem_wdata  (dmem_wdata),
         .o_dmem_wstrb  (dmem_wstrb),
         .i_dmem_rdata  (dmem_rdata),
+        .i_dmem_ready  (dmem_ready),
         .W_stall       (stall)
     );
+
+    assign imem_ready = 1'b1;
+    assign dmem_ready = 1'b1;
 
     data_memory #(
         .N(32),
@@ -37,8 +46,8 @@ module tb_load_use_hazard;
     ) dmem (
         .i_clk   (clk),
         .i_arst_n(arst_n),
-        .i_we    (dmem_write),
-        .i_re    (dmem_read),
+        .i_we    (dmem_valid && dmem_write && dmem_ready),
+        .i_re    (dmem_valid && dmem_read),
         .i_addr  (dmem_addr),
         .i_wdata (dmem_wdata),
         .i_wstrb (dmem_wstrb),

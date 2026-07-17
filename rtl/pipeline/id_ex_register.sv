@@ -10,6 +10,7 @@ module id_ex_register #(
 )(
     input  logic             i_clk,
     input  logic             i_arst_n,
+    input  logic             i_stall,      // Hold state while memory is waiting
     input  logic             i_flush,      // Flush signal for branch/jump
     
     // Inputs from ID stage
@@ -86,6 +87,9 @@ module id_ex_register #(
             o_mem_type    <= 3'b0;
             o_jal         <= 1'b0;
             o_jalr        <= 1'b0;
+        end
+        else if (i_stall) begin
+            // Keep all outputs stable until the pending memory transfer finishes.
         end
         else if (i_flush) begin
             // Flush: Insert bubble (clear control signals but keep data)

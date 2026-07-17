@@ -11,17 +11,21 @@ module rv32i_top #(
     input  logic i_clk,
     input  logic i_arst_n,
 
-    // External instruction memory interface (zero-wait-state)
+    // External instruction memory interface
+    output logic         o_imem_valid,
     output logic [N-1:0] o_imem_addr,
     input  logic [N-1:0] i_imem_rdata,
+    input  logic         i_imem_ready,
 
-    // External data memory interface (zero-wait-state)
+    // External data memory interface
+    output logic         o_dmem_valid,
     output logic         o_dmem_read,
     output logic         o_dmem_write,
     output logic [N-1:0] o_dmem_addr,
     output logic [N-1:0] o_dmem_wdata,
     output logic [3:0]   o_dmem_wstrb,
     input  logic [N-1:0] i_dmem_rdata,
+    input  logic         i_dmem_ready,
     
     // Debug/Test outputs
     output logic [N-1:0] W_PC_out,
@@ -148,6 +152,8 @@ module rv32i_top #(
     // Hazard Detection Signals
     // ==========================================================================
     logic stall_pc, stall_if_id, flush_id_ex, flush_if_id;
+    logic imem_wait, dmem_wait, memory_stall;
+    logic dmem_request, dmem_complete;
     
     // ==========================================================================
     // Forwarding Signals
@@ -167,7 +173,7 @@ module rv32i_top #(
             ex_pc_reg  <= '0;
             mem_pc_reg <= '0;
             wb_pc_reg  <= '0;
-        end else begin
+        end else if (!memory_stall) begin
             id_pc_reg  <= if_pc_current;
             ex_pc_reg  <= id_pc_reg;
             mem_pc_reg <= ex_pc_reg;
@@ -184,7 +190,7 @@ module rv32i_top #(
             ex_inst_reg  <= '0;
             mem_inst_reg <= '0;
             wb_inst_reg  <= '0;
-        end else begin
+        end else if (!memory_stall) begin
             id_inst_reg  <= if_instruction;
             ex_inst_reg  <= id_inst_reg;
             mem_inst_reg <= ex_inst_reg;
@@ -202,7 +208,7 @@ module rv32i_top #(
     assign W_ALUout       = wb_alu_result;
     assign W_WB_data      = wb_data;
     assign W_rd_addr      = wb_rd_addr;
-    assign W_reg_write    = wb_reg_write;
+    assign W_reg_write    = wb_reg_write && !memory_stall;
     assign W_mem_write    = mem_mem_write;
     assign W_mem_read     = mem_mem_read;
     
@@ -215,12 +221,19 @@ module rv32i_top #(
     assign W_mem_wdata    = mem_store_data;
     assign W_mem_rdata    = mem_load_data;
 
+    assign o_imem_valid   = i_arst_n;
+    assign imem_wait      = o_imem_valid && !i_imem_ready;
+
+    assign dmem_request   = mem_mem_read || mem_mem_write;
+    assign o_dmem_valid   = dmem_request && !dmem_complete;
     assign o_dmem_read    = mem_mem_read;
     assign o_dmem_write   = mem_mem_write;
     assign o_dmem_addr    = mem_alu_result;
     assign o_dmem_wdata   = mem_store_data;
     assign o_dmem_wstrb   = mem_byte_enable;
-    assign W_stall        = stall_if_id;
+    assign dmem_wait      = o_dmem_valid && !i_dmem_ready;
+    assign memory_stall   = imem_wait || dmem_wait;
+    assign W_stall        = stall_if_id || memory_stall;
     assign W_flush        = flush_id_ex | flush_if_id;
     assign W_immediate    = wb_immediate;
     assign W_ALUSrc       = ex_alu_src;
@@ -253,14 +266,26 @@ module rv32i_top #(
     program_counter #(.N(N)) if_pc_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_PC(stall_pc ? if_pc_current : if_pc_next),
+        .i_PC((stall_pc || memory_stall) ? if_pc_current : if_pc_next),
         .o_PC(if_pc_current)
     );
     
-    // Instruction memory is outside the CPU core. The current interface assumes
-    // a combinational/zero-wait-state response from the integration layer.
+    // Instruction memory is outside the CPU core. Address and valid remain
+    // stable whenever the integration layer deasserts ready.
     assign o_imem_addr  = if_pc_current;
     assign if_instruction = i_imem_rdata;
+
+    // A data transfer can finish while the instruction side is still waiting.
+    // Remember that completion so a store is not accepted more than once while
+    // the pipeline remains frozen by the outstanding instruction request.
+    always_ff @(posedge i_clk or negedge i_arst_n) begin
+        if (!i_arst_n)
+            dmem_complete <= 1'b0;
+        else if (!dmem_request || !memory_stall)
+            dmem_complete <= 1'b0;
+        else if (o_dmem_valid && i_dmem_ready)
+            dmem_complete <= 1'b1;
+    end
     
     // ==========================================================================
     // IF/ID Pipeline Register
@@ -269,7 +294,7 @@ module rv32i_top #(
     if_id_register #(.N(N)) if_id_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_stall(stall_if_id),
+        .i_stall(stall_if_id || memory_stall),
         .i_flush(flush_if_id),
         .i_pc(if_pc_current),
         .i_instruction(if_instruction),
@@ -312,7 +337,7 @@ module rv32i_top #(
     ) id_regfile (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_we(wb_reg_write),
+        .i_we(wb_reg_write && !memory_stall),
         .i_raddr1(id_rs1_addr),
         .i_raddr2(id_rs2_addr),
         .i_waddr(wb_rd_addr),
@@ -353,6 +378,7 @@ module rv32i_top #(
     id_ex_register #(.N(N)) id_ex_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
+        .i_stall(memory_stall),
         .i_flush(flush_id_ex),
         .i_pc(id_pc),
         .i_rs1_data(id_rs1_data),
@@ -401,6 +427,8 @@ module rv32i_top #(
         if (!i_arst_n) begin
             ex_rd1_orig <= '0;
             ex_rd2_orig <= '0;
+        end else if (memory_stall) begin
+            // Hold debug state with the corresponding ID/EX payload.
         end else if (flush_id_ex) begin
             ex_rd1_orig <= '0;
             ex_rd2_orig <= '0;
@@ -493,6 +521,7 @@ module rv32i_top #(
     ex_mem_register #(.N(N)) ex_mem_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
+        .i_stall(memory_stall),
         .i_flush(1'b0),
         .i_alu_result(ex_alu_result),
         .i_rs2_data(ex_rs2_data_forwarded),
@@ -534,7 +563,7 @@ module rv32i_top #(
         if (!i_arst_n) begin
             mem_rd1_orig <= '0;
             mem_rd2_orig <= '0;
-        end else begin
+        end else if (!memory_stall) begin
             mem_rd1_orig <= ex_rd1_orig;
             mem_rd2_orig <= ex_rd2_orig;
         end
@@ -564,6 +593,7 @@ module rv32i_top #(
     mem_wb_register #(.N(N)) mem_wb_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
+        .i_stall(memory_stall),
         .i_alu_result(mem_alu_result),
         .i_mem_read_data(mem_load_data),
         .i_return_addr(mem_return_addr),
@@ -595,7 +625,7 @@ module rv32i_top #(
         if (!i_arst_n) begin
             wb_rd1_orig <= '0;
             wb_rd2_orig <= '0;
-        end else begin
+        end else if (!memory_stall) begin
             wb_rd1_orig <= mem_rd1_orig;
             wb_rd2_orig <= mem_rd2_orig;
         end

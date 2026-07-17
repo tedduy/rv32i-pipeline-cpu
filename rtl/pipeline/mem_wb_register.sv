@@ -1,6 +1,7 @@
 module mem_wb_register #(parameter N = 32)(
     input  logic         i_clk,
     input  logic         i_arst_n,
+    input  logic         i_stall,
     
     // Inputs cũ
     input  logic [N-1:0] i_alu_result,
@@ -46,6 +47,8 @@ module mem_wb_register #(parameter N = 32)(
             o_jal           <= 1'b0;
             o_jalr          <= 1'b0;
             o_branch_taken  <= 1'b0; // <--- Reset
+        end else if (i_stall) begin
+            // Hold write-back state while an external memory transfer is pending.
         end else begin
             // ... (Gán các biến cũ) ...
             o_alu_result    <= i_alu_result;

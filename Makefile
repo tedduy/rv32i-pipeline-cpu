@@ -108,6 +108,7 @@ help:
 	@echo ""
 	@echo "Integration Tests:"
 	@echo "  tb_rv32i_pipeline, tb_full_verification, tb_load_use_hazard"
+	@echo "  tb_memory_wait_states"
 	@echo ""
 	@echo "Gate-Level:"
 	@echo "  Run 3 (Best Config) - 0.81mm², 50MHz, 0 DRC violations"
