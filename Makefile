@@ -4,7 +4,7 @@
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
 	vcs vcs-compile vcs-run vcs-gui vcs-regression verdi act-tools-check act-generate act-compile act-run \
-	act-regression distclean
+	act-regression act-zicsr distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -28,6 +28,7 @@ VCS_BUILD_ROOT = build/vcs
 ACT_CONFIG = compliance/act4/test_config.yaml
 ACT_WORK_DIR = build/act4
 ACT_MAX_CYCLES ?= 1000000
+ACT_EXTENSIONS ?= I,Zicsr
 ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
 ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs
@@ -117,6 +118,7 @@ help:
 	@echo "  make act-generate       - Generate official RV32I self-checking ELFs"
 	@echo "  make act-run ELF=/path/to/test.elf"
 	@echo "  make act-regression     - Run all generated RV32I ELFs"
+	@echo "  make act-zicsr          - Run only the six generated Zicsr ELFs"
 	@echo ""
 	@echo "Gate-Level Simulation Commands:"
 	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
@@ -258,7 +260,7 @@ act-generate: act-tools-check
 	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" \
 		CONFIG_FILES="$(abspath $(ACT_CONFIG))" \
 		WORKDIR="$(abspath $(ACT_WORK_DIR))/generated" \
-		EXTENSIONS=I
+		EXTENSIONS="$(ACT_EXTENSIONS)"
 
 # Compile the unified-memory ACT4 harness once; it can run every generated ELF.
 act-compile: TB=tb_act
@@ -275,6 +277,10 @@ act-run: act-compile
 act-regression: act-compile
 	@python3 scripts/run_act.py "$(ACT_ELF_DIR)" --simv "$(VCS_BUILD_ROOT)/tb_act/simv" \
 		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
+
+# Convenience target for the Zicsr subset; avoids passing a long ACT_ELF_DIR.
+act-zicsr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zicsr
+act-zicsr: act-regression
 
 # Compile the generated Sky130 netlist independently from RTL.
 gl-compile:
