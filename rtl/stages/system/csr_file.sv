@@ -34,9 +34,13 @@ module csr_file #(
 );
 
     localparam logic [11:0] CSR_MSTATUS  = 12'h300;
+    localparam logic [11:0] CSR_MSTATUSH = 12'h310;
     localparam logic [11:0] CSR_MISA     = 12'h301;
     localparam logic [11:0] CSR_MIE      = 12'h304;
     localparam logic [11:0] CSR_MTVEC    = 12'h305;
+    localparam logic [11:0] CSR_MCOUNTINHIBIT = 12'h320;
+    localparam logic [11:0] CSR_MHPMEVENT3 = 12'h323;
+    localparam logic [11:0] CSR_MHPMEVENT31 = 12'h33F;
     localparam logic [11:0] CSR_MSCRATCH = 12'h340;
     localparam logic [11:0] CSR_MEPC     = 12'h341;
     localparam logic [11:0] CSR_MCAUSE   = 12'h342;
@@ -67,6 +71,7 @@ module csr_file #(
     logic [N-1:0]     mtval;
     logic [63:0]      mcycle;
     logic [63:0]      minstret;
+    logic [N-1:0]     mcountinhibit;
 
     assign o_mtvec = mtvec;
     assign o_mepc  = mepc;
@@ -98,11 +103,16 @@ module csr_file #(
         unique case (i_csr_addr)
             CSR_MSTATUS:   o_csr_rdata = {{(N-13){1'b0}}, 2'b11, 3'b000,
                                           mstatus_mpie, 3'b000, mstatus_mie, 3'b000};
+            // mstatush exists on RV32. This little-endian RV32I core does not
+            // implement any of its optional fields, so all bits are WARL zero.
+            // Writes are nevertheless legal and are ignored.
+            CSR_MSTATUSH:  o_csr_rdata = '0;
             // misa is at a read/write CSR address, but every implemented field
             // is immutable in this core. Writes are legal and have no effect.
             CSR_MISA:      o_csr_rdata = MISA_VALUE;
             CSR_MIE:       o_csr_rdata = mie;
             CSR_MTVEC:     o_csr_rdata = mtvec;
+            CSR_MCOUNTINHIBIT: o_csr_rdata = mcountinhibit;
             CSR_MSCRATCH:  o_csr_rdata = mscratch;
             CSR_MEPC:      o_csr_rdata = mepc;
             CSR_MCAUSE:    o_csr_rdata = mcause;
@@ -137,9 +147,17 @@ module csr_file #(
                 o_csr_writable = 1'b0;
             end
             default: begin
-                o_csr_rdata = '0;
-                o_csr_valid = 1'b0;
-                o_csr_writable = 1'b0;
+                if ((i_csr_addr >= CSR_MHPMEVENT3) &&
+                    (i_csr_addr <= CSR_MHPMEVENT31)) begin
+                    // Unimplemented HPM event selectors are legal WARL-zero
+                    // CSRs. This lets generic machine-mode software disable
+                    // them without pretending that HPM counters exist.
+                    o_csr_rdata = '0;
+                end else begin
+                    o_csr_rdata = '0;
+                    o_csr_valid = 1'b0;
+                    o_csr_writable = 1'b0;
+                end
             end
         endcase
     end
@@ -156,9 +174,11 @@ module csr_file #(
             mtval        <= '0;
             mcycle       <= '0;
             minstret     <= '0;
+            mcountinhibit <= '0;
         end else begin
-            mcycle <= mcycle + 64'd1;
-            if (i_retire)
+            if (!mcountinhibit[0])
+                mcycle <= mcycle + 64'd1;
+            if (i_retire && !mcountinhibit[2])
                 minstret <= minstret + 64'd1;
 
             if (i_trap_enter) begin
@@ -179,6 +199,8 @@ module csr_file #(
                     CSR_MIE:       mie               <= i_csr_wdata &
                                                           {{(N-12){1'b0}}, 12'h888};
                     CSR_MTVEC:     mtvec             <= {i_csr_wdata[N-1:2], 2'b00};
+                    CSR_MCOUNTINHIBIT: mcountinhibit <= i_csr_wdata &
+                                                          {{(N-3){1'b0}}, 3'b101};
                     CSR_MSCRATCH:  mscratch          <= i_csr_wdata;
                     CSR_MEPC:      mepc              <= {i_csr_wdata[N-1:2], 2'b00};
                     CSR_MCAUSE:    mcause            <= i_csr_wdata;

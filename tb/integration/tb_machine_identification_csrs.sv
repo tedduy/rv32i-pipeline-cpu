@@ -80,10 +80,19 @@ module tb_machine_identification_csrs;
             32'h0000_001c: imem_rdata = 32'hf140_22f3; // csrr  x5, mhartid
             32'h0000_0020: imem_rdata = 32'hf150_2373; // csrr  x6, mconfigptr
 
+            // mstatush is present on RV32. Unsupported WARL fields read zero,
+            // and writes must be accepted rather than raising an exception.
+            32'h0000_0024: imem_rdata = 32'h3100_9073; // csrw  mstatush, x1
+            32'h0000_0028: imem_rdata = 32'h3100_25f3; // csrr  x11, mstatush
+            32'h0000_002c: imem_rdata = 32'h0050_0613; // addi  x12, x0, 5
+            32'h0000_0030: imem_rdata = 32'h3206_1073; // csrw  mcountinhibit, x12
+            32'h0000_0034: imem_rdata = 32'h3200_26f3; // csrr  x13, mcountinhibit
+            32'h0000_0038: imem_rdata = 32'h3200_1073; // csrw  mcountinhibit, x0
+
             // A CSRRW always attempts a write, even with rs1=x0. Writing a
             // read-only machine-identification CSR must raise illegal instruction.
-            32'h0000_0024: imem_rdata = 32'hf110_1073; // csrw  mvendorid, x0
-            32'h0000_0028: imem_rdata = 32'h0070_0513; // addi  x10, x0, 7
+            32'h0000_003c: imem_rdata = 32'hf110_1073; // csrw  mvendorid, x0
+            32'h0000_0040: imem_rdata = 32'h0070_0513; // addi  x10, x0, 7
 
             32'h0000_0100: imem_rdata = 32'h3420_2473; // csrr  x8, mcause
             32'h0000_0104: imem_rdata = 32'h3410_24f3; // csrr  x9, mepc
@@ -120,11 +129,17 @@ module tb_machine_identification_csrs;
         if (dut.id_regfile.regs[5] !== TEST_HART_ID)
             $fatal(1, "mhartid=%08h, expected %08h",
                    dut.id_regfile.regs[5], TEST_HART_ID);
+        if (dut.id_regfile.regs[11] !== 32'b0)
+            $fatal(1, "mstatush=%08h, expected unsupported WARL fields to read zero",
+                   dut.id_regfile.regs[11]);
+        if (dut.id_regfile.regs[13] !== 32'h0000_0005)
+            $fatal(1, "mcountinhibit=%08h, expected implemented CY/IR bits",
+                   dut.id_regfile.regs[13]);
         if (dut.id_regfile.regs[8] !== 32'd2)
             $fatal(1, "Read-only CSR write produced mcause=%08h, expected 2",
                    dut.id_regfile.regs[8]);
-        if (dut.id_regfile.regs[9] !== 32'h0000_0028)
-            $fatal(1, "Trap handler produced resume PC=%08h, expected 00000028",
+        if (dut.id_regfile.regs[9] !== 32'h0000_0040)
+            $fatal(1, "Trap handler produced resume PC=%08h, expected 00000040",
                    dut.id_regfile.regs[9]);
 
         $display("*** MACHINE IDENTIFICATION CSR TEST PASSED ***");

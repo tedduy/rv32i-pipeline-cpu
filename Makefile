@@ -4,7 +4,7 @@
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
 	vcs vcs-compile vcs-run vcs-gui vcs-regression verdi act-tools-check act-generate act-compile act-run \
-	act-regression act-zicsr distclean
+	act-regression act-zicsr act-sm-prepare act-sm-generate act-sm-exceptions distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -29,9 +29,12 @@ ACT_CONFIG = compliance/act4/test_config.yaml
 ACT_WORK_DIR = build/act4
 ACT_MAX_CYCLES ?= 1000000
 ACT_EXTENSIONS ?= I,Zicsr
+ACT_EXCLUDE_EXTENSIONS ?=
 ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
 ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs
+ACT_SM_PATCHES = compliance/act4/patches/0001-split-exceptions-sm.patch \
+	compliance/act4/patches/0002-fix-ialign32-trap-resume.patch
 ACT_ENV = env \
 	PATH="$(ACT_TOOL_ROOT)/bin:$(ACT_TOOL_ROOT)/toolchain/bin:$(ACT_TOOL_ROOT)/sail/bin:$$PATH" \
 	MISE_DATA_DIR="$(ACT_TOOL_ROOT)/mise-data" \
@@ -119,6 +122,8 @@ help:
 	@echo "  make act-run ELF=/path/to/test.elf"
 	@echo "  make act-regression     - Run all generated RV32I ELFs"
 	@echo "  make act-zicsr          - Run only the six generated Zicsr ELFs"
+	@echo "  make act-sm-generate    - Generate the privileged ExceptionsSm ELF"
+	@echo "  make act-sm-exceptions  - Run the generated ExceptionsSm ELF"
 	@echo ""
 	@echo "Gate-Level Simulation Commands:"
 	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
@@ -261,7 +266,8 @@ act-generate: act-tools-check
 	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" \
 		CONFIG_FILES="$(abspath $(ACT_CONFIG))" \
 		WORKDIR="$(abspath $(ACT_WORK_DIR))/generated" \
-		EXTENSIONS="$(ACT_EXTENSIONS)"
+		EXTENSIONS="$(ACT_EXTENSIONS)" \
+		EXCLUDE_EXTENSIONS="$(ACT_EXCLUDE_EXTENSIONS)"
 
 # Compile the unified-memory ACT4 harness once; it can run every generated ELF.
 act-compile: TB=tb_act
@@ -282,6 +288,38 @@ act-regression: act-compile
 # Convenience target for the Zicsr subset; avoids passing a long ACT_ELF_DIR.
 act-zicsr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zicsr
 act-zicsr: act-regression
+
+# Apply the project-local ACT4 split reproducibly. Accept both a clean checkout
+# and an already-patched local tool tree.
+act-sm-prepare: act-tools-check
+	@set -e; \
+	for patch in $(addprefix $(CURDIR)/,$(ACT_SM_PATCHES)); do \
+		if git -C "$(ACT_ROOT)" apply --check "$$patch" >/dev/null 2>&1; then \
+			git -C "$(ACT_ROOT)" apply "$$patch"; \
+		elif git -C "$(ACT_ROOT)" apply --reverse --check "$$patch" >/dev/null 2>&1; then \
+			:; \
+		else \
+			echo "Error: ACT4 patch does not match this checkout: $$patch"; \
+			exit 1; \
+		fi; \
+	done
+
+# ACT4 caches generated assembly independently of the extension filter. Remove
+# only stale ExceptionsSm sources/ELFs, then regenerate the suite as 8 ELFs.
+act-sm-generate: act-sm-prepare
+	@find "$(ACT_ROOT)/tests/priv/ExceptionsSm" -maxdepth 1 -type f -name '*.S' -delete 2>/dev/null || true
+	@find "$(abspath $(ACT_WORK_DIR))/generated/rv32i-pipeline/elfs/priv/ExceptionsSm" \
+		-type f -delete 2>/dev/null || true
+	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" -B tests \
+		EXTENSIONS=ExceptionsSm EXCLUDE_EXTENSIONS=
+	@mkdir -p "$(abspath $(ACT_WORK_DIR))/generated"
+	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" \
+		CONFIG_FILES="$(abspath $(ACT_CONFIG))" \
+		WORKDIR="$(abspath $(ACT_WORK_DIR))/generated" \
+		EXTENSIONS=ExceptionsSm EXCLUDE_EXTENSIONS=
+
+act-sm-exceptions: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/priv/ExceptionsSm
+act-sm-exceptions: act-regression
 
 # Compile the generated Sky130 netlist independently from RTL.
 gl-compile:

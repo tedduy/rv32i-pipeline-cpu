@@ -3,8 +3,10 @@
 
 #define RVMODEL_DATA_SECTION
 
-/* Base-I tests execute directly from the core's reset state. */
-#define RVMODEL_BOOT_TO_MMODE
+/* Use ACT4's standard machine-mode prolog and trap handlers. Defining
+ * RVMODEL_BOOT_TO_MMODE as an empty override would skip mtvec setup and make
+ * every synchronous exception restart execution at address zero. */
+#define STANDARD_SM_SUPPORTED
 
 /*
  * ACT4 requires every target model to provide the interrupt hooks below,

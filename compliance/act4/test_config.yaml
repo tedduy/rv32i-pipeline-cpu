@@ -5,4 +5,4 @@ ref_model_exe: sail_riscv_sim
 udb_config: rv32i-pipeline.yaml
 linker_script: link.ld
 dut_include_dir: .
-include_priv_tests: false
+include_priv_tests: true

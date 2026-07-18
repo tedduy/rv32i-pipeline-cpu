@@ -38,12 +38,12 @@
     // will be zeroed to respect the specified alignment.
     "mtvec": {
       "direct": {
-        "supported": false,
+        "supported": true,
         "base_alignment": 2
       },
       "vectored": {
-        "supported": true,
-        "base_alignment": 8
+        "supported": false,
+        "base_alignment": 2
       }
     },
     // Similar to `mtvec` above. If `S` mode is not supported, these
@@ -67,13 +67,13 @@
       "illegal_instruction": true,
       "software_breakpoint": false,
       "hardware_breakpoint": false,
-      "load_address_misaligned": false,
+      "load_address_misaligned": true,
       "load_access_fault": true,
       "load_page_fault": false,
-      "samo_address_misaligned": false,
+      "samo_address_misaligned": true,
       "samo_access_fault": true,
       "samo_page_fault": false,
-      "fetch_address_misaligned": false,
+      "fetch_address_misaligned": true,
       "fetch_access_fault": true,
       "fetch_page_fault": false,
       "software_check": false,
@@ -138,11 +138,11 @@
     // checked before address translation. `misaligned_exceptions` in
     // `regions` is checked after address translation.
     "misaligned": {
-      // CV32E20 LSU handles misaligned loads/stores in hardware (splits into two
-      // aligned transactions). No alignment exception is ever raised.
+      // The core raises precise address-misaligned exceptions before issuing a
+      // data-memory transaction.
       "exceptions": {
-        "load_store": { "None": null },
-        "vector": { "None": null },
+        "load_store": { "Some": "AlignmentException" },
+        "vector": { "Some": "AlignmentException" },
         "lrsc": "AccessFault",
         "amo": "AccessFault"
       },
