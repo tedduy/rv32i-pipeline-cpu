@@ -58,6 +58,7 @@ tb/integration/tb_bus_access_faults.sv
 tb/integration/tb_ahb_lite_interface.sv
 tb/integration/tb_wfi_sleep.sv
 tb/integration/tb_fence_i.sv
+tb/integration/tb_zicntr.sv
 tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv

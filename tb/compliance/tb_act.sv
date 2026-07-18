@@ -45,6 +45,7 @@ module tb_act;
     string       test_name;
     integer      max_cycles;
     integer      cycle_count;
+    logic [63:0] time_counter;
     integer      i;
     logic [31:0] dmem_word_addr;
 
@@ -56,6 +57,7 @@ module tb_act;
         .i_irq_software        (1'b0),
         .i_irq_timer           (1'b0),
         .i_irq_external        (1'b0),
+        .i_time                (time_counter),
         .o_core_sleep          (),
         .o_fence_i             (),
         .o_imem_valid          (imem_valid),
@@ -110,6 +112,13 @@ module tb_act;
     initial begin
         clk = 1'b0;
         forever #5 clk = ~clk;
+    end
+
+    always_ff @(posedge clk or negedge arst_n) begin
+        if (!arst_n)
+            time_counter <= 64'b0;
+        else
+            time_counter <= time_counter + 64'd1;
     end
 
     always_comb begin

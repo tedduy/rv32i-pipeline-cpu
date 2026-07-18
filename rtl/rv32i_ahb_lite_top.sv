@@ -15,6 +15,7 @@ module rv32i_top #(
     input  logic i_irq_software,
     input  logic i_irq_timer,
     input  logic i_irq_external,
+    input  logic [63:0] i_time,
 
     output logic o_core_sleep,
     output logic o_fence_i,
@@ -82,6 +83,7 @@ module rv32i_top #(
         .i_irq_software(i_irq_software),
         .i_irq_timer(i_irq_timer),
         .i_irq_external(i_irq_external),
+        .i_time(i_time),
         .o_core_sleep(core_sleep),
         .o_fence_i(o_fence_i),
         .o_imem_valid(imem_valid),

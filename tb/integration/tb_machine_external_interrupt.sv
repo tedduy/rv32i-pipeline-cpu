@@ -17,6 +17,7 @@ module tb_machine_external_interrupt;
         .i_irq_software      (1'b0),
         .i_irq_timer         (1'b0),
         .i_irq_external      (irq_external),
+        .i_time              (64'b0),
         .o_core_sleep        (),
         .o_fence_i           (),
         .o_imem_valid        (imem_valid),

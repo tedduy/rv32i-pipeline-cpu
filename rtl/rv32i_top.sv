@@ -21,6 +21,7 @@ module rv32i_core #(
     input  logic i_irq_software,
     input  logic i_irq_timer,
     input  logic i_irq_external,
+    input  logic [63:0] i_time,
 
     output logic o_core_sleep,
     output logic o_fence_i,
@@ -223,6 +224,9 @@ module rv32i_core #(
     // Hazard Detection Signals
     // ==========================================================================
     logic stall_pc, stall_if_id, flush_id_ex, flush_if_id;
+    logic hazard_stall_pc, hazard_stall_if_id;
+    logic hazard_flush_id_ex, hazard_flush_if_id;
+    logic csr_order_stall;
     logic pipeline_flush_id_ex, pipeline_flush_if_id;
     logic imem_wait, dmem_wait, memory_stall;
     logic dmem_request, dmem_complete, dmem_error_pending;
@@ -367,7 +371,10 @@ module rv32i_core #(
     ) if_pc_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_PC((core_sleep || memory_stall || (stall_pc && !system_redirect)) ?
+        // A taken branch/jump in EX must win over a CSR interlock caused by a
+        // younger, wrong-path CSR instruction in ID.
+        .i_PC((core_sleep || memory_stall ||
+               (stall_pc && !system_redirect && !hazard_flush_if_id)) ?
               if_pc_current : if_pc_next),
         .o_PC(if_pc_current)
     );
@@ -487,11 +494,23 @@ module rv32i_core #(
         .i_ex_branch_taken(ex_branch_taken),
         .i_ex_jal(ex_jal),
         .i_ex_jalr(ex_jalr),
-        .o_stall_pc(stall_pc),
-        .o_stall_if_id(stall_if_id),
-        .o_flush_id_ex(flush_id_ex),
-        .o_flush_if_id(flush_if_id)
+        .o_stall_pc(hazard_stall_pc),
+        .o_stall_if_id(hazard_stall_if_id),
+        .o_flush_id_ex(hazard_flush_id_ex),
+        .o_flush_if_id(hazard_flush_if_id)
     );
+
+    // CSR accesses are architecturally ordered after all older instructions.
+    // Drain EX/MEM/WB before allowing a CSR instruction to enter EX so that
+    // reads of instret observe every preceding instruction as already retired.
+    // This also gives CSR writes strict program order without speculative CSR
+    // state or counter-specific forwarding.
+    assign csr_order_stall = id_valid && id_csr_en &&
+                             (ex_valid || mem_valid || wb_valid);
+    assign stall_pc        = hazard_stall_pc || csr_order_stall;
+    assign stall_if_id     = hazard_stall_if_id || csr_order_stall;
+    assign flush_id_ex     = hazard_flush_id_ex || csr_order_stall;
+    assign flush_if_id     = hazard_flush_if_id;
 
     assign pipeline_flush_if_id = flush_if_id || system_redirect;
     assign pipeline_flush_id_ex = flush_id_ex || system_redirect;
@@ -814,6 +833,7 @@ module rv32i_core #(
         .i_trap_value(trap_value),
         .i_mret(mret_taken),
         .i_retire(o_commit_valid),
+        .i_time(i_time),
         .i_irq_software(i_irq_software),
         .i_irq_timer(i_irq_timer),
         .i_irq_external(i_irq_external),

@@ -4,21 +4,23 @@ $schema: config_schema.json#
 kind: architecture configuration
 type: fully configured
 name: rv32i-pipeline
-description: RV32I, Zicsr and Zifencei compliance profile for the rv32i-pipeline CPU
+description: RV32I, Zicsr, Zifencei and Zicntr compliance profile for the rv32i-pipeline CPU
 
 # Sm supplies the machine-mode architectural context used by the core's CSR,
-# trap and interrupt implementation. Zicsr and Zifencei are tested as
+# trap and interrupt implementation. Zicsr, Zifencei and Zicntr are tested as
 # independent unprivileged extensions.
 implemented_extensions:
   - { name: I, version: "= 2.1" }
   - { name: Zicsr, version: "= 2.0" }
   - { name: Zifencei, version: "= 2.0" }
+  - { name: Zicntr, version: "= 2.0" }
   - { name: Sm, version: "= 1.12.0" }
 
 params:
   MXLEN: 32
   PHYS_ADDR_WIDTH: 32
   M_MODE_ENDIANNESS: little
+  TIME_CSR_IMPLEMENTED: true
 
   PRECISE_SYNCHRONOUS_EXCEPTIONS: true
   TRAP_ON_ECALL_FROM_M: true

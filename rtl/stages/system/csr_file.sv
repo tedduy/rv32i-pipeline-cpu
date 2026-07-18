@@ -22,6 +22,8 @@ module csr_file #(
     input  logic [N-1:0]     i_trap_value,
     input  logic             i_mret,
     input  logic             i_retire,
+    // Platform timebase, normally supplied by the SoC timer/RTC domain.
+    input  logic [63:0]      i_time,
 
     input  logic             i_irq_software,
     input  logic             i_irq_timer,
@@ -51,6 +53,12 @@ module csr_file #(
     localparam logic [11:0] CSR_MINSTRET = 12'hB02;
     localparam logic [11:0] CSR_MCYCLEH  = 12'hB80;
     localparam logic [11:0] CSR_MINSTRETH = 12'hB82;
+    localparam logic [11:0] CSR_CYCLE    = 12'hC00;
+    localparam logic [11:0] CSR_TIME     = 12'hC01;
+    localparam logic [11:0] CSR_INSTRET  = 12'hC02;
+    localparam logic [11:0] CSR_CYCLEH   = 12'hC80;
+    localparam logic [11:0] CSR_TIMEH    = 12'hC81;
+    localparam logic [11:0] CSR_INSTRETH = 12'hC82;
     localparam logic [11:0] CSR_MVENDORID = 12'hF11;
     localparam logic [11:0] CSR_MARCHID   = 12'hF12;
     localparam logic [11:0] CSR_MIMPID    = 12'hF13;
@@ -130,6 +138,32 @@ module csr_file #(
             CSR_MINSTRET:  o_csr_rdata = minstret[31:0];
             CSR_MCYCLEH:   o_csr_rdata = mcycle[63:32];
             CSR_MINSTRETH: o_csr_rdata = minstret[63:32];
+            // Zicntr unprivileged shadows are architecturally read-only, even
+            // when accessed from machine mode.
+            CSR_CYCLE: begin
+                o_csr_rdata = mcycle[31:0];
+                o_csr_writable = 1'b0;
+            end
+            CSR_TIME: begin
+                o_csr_rdata = i_time[31:0];
+                o_csr_writable = 1'b0;
+            end
+            CSR_INSTRET: begin
+                o_csr_rdata = minstret[31:0];
+                o_csr_writable = 1'b0;
+            end
+            CSR_CYCLEH: begin
+                o_csr_rdata = mcycle[63:32];
+                o_csr_writable = 1'b0;
+            end
+            CSR_TIMEH: begin
+                o_csr_rdata = i_time[63:32];
+                o_csr_writable = 1'b0;
+            end
+            CSR_INSTRETH: begin
+                o_csr_rdata = minstret[63:32];
+                o_csr_writable = 1'b0;
+            end
             CSR_MVENDORID: begin
                 o_csr_rdata = MVENDOR_ID;
                 o_csr_writable = 1'b0;
