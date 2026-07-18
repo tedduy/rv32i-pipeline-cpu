@@ -26,6 +26,7 @@ module tb_load_use_hazard;
         .i_irq_timer   (1'b0),
         .i_irq_external(1'b0),
         .o_core_sleep  (),
+        .o_fence_i     (),
         .o_imem_addr   (imem_addr),
         .i_imem_rdata  (imem_rdata),
         .o_imem_valid  (imem_valid),

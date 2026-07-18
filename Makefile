@@ -4,7 +4,7 @@
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
 	vcs vcs-compile vcs-run vcs-gui vcs-regression verdi act-tools-check act-generate act-compile act-run \
-	act-regression act-zicsr act-sm-prepare act-sm-generate act-sm-exceptions distclean
+	act-regression act-zicsr act-zifencei act-sm-prepare act-sm-generate act-sm-exceptions distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -28,7 +28,7 @@ VCS_BUILD_ROOT = build/vcs
 ACT_CONFIG = compliance/act4/test_config.yaml
 ACT_WORK_DIR = build/act4
 ACT_MAX_CYCLES ?= 1000000
-ACT_EXTENSIONS ?= I,Zicsr
+ACT_EXTENSIONS ?= I,Zicsr,Zifencei
 ACT_EXCLUDE_EXTENSIONS ?=
 ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
@@ -89,6 +89,7 @@ INTEGRATION_TESTS = tb_rv32i_pipeline tb_full_verification tb_load_use_hazard \
 INTEGRATION_TESTS += tb_bus_access_faults
 INTEGRATION_TESTS += tb_ahb_lite_interface
 INTEGRATION_TESTS += tb_wfi_sleep
+INTEGRATION_TESTS += tb_fence_i
 
 VCS_REGRESSION_TESTS = $(UNIT_TESTS) $(INTEGRATION_TESTS)
 
@@ -126,6 +127,7 @@ help:
 	@echo "  make act-run ELF=/path/to/test.elf"
 	@echo "  make act-regression     - Run all generated RV32I ELFs"
 	@echo "  make act-zicsr          - Run only the six generated Zicsr ELFs"
+	@echo "  make act-zifencei       - Run only the generated Zifencei ELFs"
 	@echo "  make act-sm-generate    - Generate the privileged ExceptionsSm ELF"
 	@echo "  make act-sm-exceptions  - Run the generated ExceptionsSm ELF"
 	@echo ""
@@ -162,6 +164,7 @@ help:
 	@echo "  tb_bus_access_faults"
 	@echo "  tb_ahb_lite_interface"
 	@echo "  tb_wfi_sleep"
+	@echo "  tb_fence_i"
 	@echo ""
 	@echo "Gate-Level:"
 	@echo "  Run 3 (Best Config) - 0.81mm², 50MHz, 0 DRC violations"
@@ -296,6 +299,10 @@ act-regression: act-compile
 # Convenience target for the Zicsr subset; avoids passing a long ACT_ELF_DIR.
 act-zicsr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zicsr
 act-zicsr: act-regression
+
+# Convenience target for the Zifencei subset.
+act-zifencei: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zifencei
+act-zifencei: act-regression
 
 # Apply the project-local ACT4 split reproducibly. Accept both a clean checkout
 # and an already-patched local tool tree.

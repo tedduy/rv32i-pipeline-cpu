@@ -18,6 +18,7 @@ module tb_wfi_sleep;
         .i_irq_timer(1'b0),
         .i_irq_external(irq_external),
         .o_core_sleep(core_sleep),
+        .o_fence_i(),
         .o_imem_valid(imem_valid),
         .o_imem_addr(imem_addr),
         .i_imem_rdata(imem_rdata),

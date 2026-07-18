@@ -23,6 +23,7 @@ module rv32i_core #(
     input  logic i_irq_external,
 
     output logic o_core_sleep,
+    output logic o_fence_i,
 
     // External instruction memory interface
     output logic         o_imem_valid,
@@ -116,7 +117,7 @@ module rv32i_core #(
     logic        id_jal, id_jalr;
     logic        id_csr_en, id_csr_imm;
     logic [1:0]  id_csr_op;
-    logic        id_ecall, id_ebreak, id_mret, id_wfi, id_illegal;
+    logic        id_ecall, id_ebreak, id_mret, id_wfi, id_fence_i, id_illegal;
     
     // ==========================================================================
     // ID/EX Pipeline Register Signals
@@ -135,7 +136,7 @@ module rv32i_core #(
     logic         ex_jal, ex_jalr;
     logic         ex_csr_en, ex_csr_imm;
     logic [1:0]   ex_csr_op;
-    logic         ex_ecall, ex_ebreak, ex_mret, ex_wfi, ex_illegal;
+    logic         ex_ecall, ex_ebreak, ex_mret, ex_wfi, ex_fence_i, ex_illegal;
     // Debug: Original register values for tracking
     logic [N-1:0] ex_rd1_orig, ex_rd2_orig;
     
@@ -159,7 +160,7 @@ module rv32i_core #(
     logic         csr_write, csr_write_intent;
     logic         csr_valid, csr_writable, csr_access_illegal;
     logic         ex_sync_trap, irq_take, trap_enter, mret_taken, wfi_sleep;
-    logic         system_redirect, core_sleep;
+    logic         fence_i_taken, system_redirect, core_sleep;
     logic         csr_irq_pending, csr_wake_pending;
     logic [N-1:0] csr_irq_cause, trap_cause, trap_value;
     logic [N-1:0] trap_pc;
@@ -296,6 +297,7 @@ module rv32i_core #(
 
     assign o_imem_valid   = i_arst_n && !core_sleep;
     assign o_core_sleep   = core_sleep;
+    assign o_fence_i      = fence_i_taken;
     assign imem_wait      = o_imem_valid && !i_imem_ready;
 
     assign dmem_request   = mem_mem_read || mem_mem_write;
@@ -446,6 +448,7 @@ module rv32i_core #(
         .o_Ebreak(id_ebreak),
         .o_Mret(id_mret),
         .o_Wfi(id_wfi),
+        .o_FenceI(id_fence_i),
         .o_Illegal(id_illegal)
     );
     
@@ -532,6 +535,7 @@ module rv32i_core #(
         .i_ebreak(id_ebreak),
         .i_mret(id_mret),
         .i_wfi(id_wfi),
+        .i_fence_i(id_fence_i),
         .i_illegal(id_illegal),
         .o_valid(ex_valid),
         .o_access_fault(ex_instruction_access_fault),
@@ -563,6 +567,7 @@ module rv32i_core #(
         .o_ebreak(ex_ebreak),
         .o_mret(ex_mret),
         .o_wfi(ex_wfi),
+        .o_fence_i(ex_fence_i),
         .o_illegal(ex_illegal)
     );
     
@@ -737,7 +742,9 @@ module rv32i_core #(
     assign wfi_sleep = ex_valid && ex_wfi && !data_access_exception &&
                        !ex_sync_trap && !irq_take && !memory_stall &&
                        !csr_wake_pending;
-    assign system_redirect = trap_enter || mret_taken || wfi_sleep;
+    assign fence_i_taken = ex_valid && ex_fence_i && !data_access_exception &&
+                           !ex_sync_trap && !irq_take && !memory_stall;
+    assign system_redirect = trap_enter || mret_taken || wfi_sleep || fence_i_taken;
     assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00} :
                                 mret_taken ? {csr_mepc[N-1:2], 2'b00} :
                                              ex_pc + {{(N-3){1'b0}}, 3'd4};

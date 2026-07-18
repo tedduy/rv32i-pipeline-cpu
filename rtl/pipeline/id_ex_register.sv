@@ -46,6 +46,7 @@ module id_ex_register #(
     input  logic             i_ebreak,
     input  logic             i_mret,
     input  logic             i_wfi,
+    input  logic             i_fence_i,
     input  logic             i_illegal,
     
     // Outputs to EX stage
@@ -81,6 +82,7 @@ module id_ex_register #(
     output logic             o_ebreak,
     output logic             o_mret,
     output logic             o_wfi,
+    output logic             o_fence_i,
     output logic             o_illegal
 );
 
@@ -119,6 +121,7 @@ module id_ex_register #(
             o_ebreak      <= 1'b0;
             o_mret        <= 1'b0;
             o_wfi         <= 1'b0;
+            o_fence_i     <= 1'b0;
             o_illegal     <= 1'b0;
         end
         else if (i_stall) begin
@@ -158,6 +161,7 @@ module id_ex_register #(
             o_ebreak      <= 1'b0;
             o_mret        <= 1'b0;
             o_wfi         <= 1'b0;
+            o_fence_i     <= 1'b0;
             o_illegal     <= 1'b0;
         end
         else begin
@@ -194,6 +198,7 @@ module id_ex_register #(
             o_ebreak      <= i_ebreak;
             o_mret        <= i_mret;
             o_wfi         <= i_wfi;
+            o_fence_i     <= i_fence_i;
             o_illegal     <= i_illegal;
         end
     end

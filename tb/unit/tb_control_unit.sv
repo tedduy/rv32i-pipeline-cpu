@@ -25,6 +25,7 @@ module tb_control_unit;
   logic        Ebreak;
   logic        Mret;
   logic        Wfi;
+  logic        FenceI;
   logic        Illegal;
 
   // Instantiate DUT
@@ -51,6 +52,7 @@ module tb_control_unit;
     .o_Ebreak(Ebreak),
     .o_Mret(Mret),
     .o_Wfi(Wfi),
+    .o_FenceI(FenceI),
     .o_Illegal(Illegal)
   );
 
@@ -208,6 +210,48 @@ module tb_control_unit;
       pass_count++;
     end else begin
       $display("[FAIL] WFI decode");
+    end
+
+    instruction = 32'h0000_100f; // fence.i
+    #1;
+    test_count++;
+    if (FenceI && !Illegal && !RegWrite && !MemRead && !MemWrite) begin
+      $display("[PASS] FENCE.I");
+      pass_count++;
+    end else begin
+      $display("[FAIL] FENCE.I decode");
+    end
+
+    // The reserved imm, rs1, and rd fields do not participate in FENCE.I
+    // decoding.  ACT4 exercises these encodings explicitly.
+    instruction = 32'h0001_100f; // non-zero rs1
+    #1;
+    test_count++;
+    if (FenceI && !Illegal) begin
+      $display("[PASS] FENCE.I ignores rs1");
+      pass_count++;
+    end else begin
+      $display("[FAIL] FENCE.I non-zero rs1 decode");
+    end
+
+    instruction = 32'h0000_108f; // non-zero rd
+    #1;
+    test_count++;
+    if (FenceI && !Illegal) begin
+      $display("[PASS] FENCE.I ignores rd");
+      pass_count++;
+    end else begin
+      $display("[FAIL] FENCE.I non-zero rd decode");
+    end
+
+    instruction = 32'h0010_100f; // non-zero immediate
+    #1;
+    test_count++;
+    if (FenceI && !Illegal) begin
+      $display("[PASS] FENCE.I ignores immediate");
+      pass_count++;
+    end else begin
+      $display("[FAIL] FENCE.I non-zero immediate decode");
     end
 
     instruction = 32'hffff_ffff;

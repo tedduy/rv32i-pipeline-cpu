@@ -33,6 +33,7 @@ module control_unit (
   output logic        o_Ebreak,
   output logic        o_Mret,
   output logic        o_Wfi,
+  output logic        o_FenceI,
   output logic        o_Illegal
 );
 
@@ -140,7 +141,10 @@ module control_unit (
             default: instruction_is_legal = 1'b0;
           endcase
         end
-        OP_MISC_MEM: instruction_is_legal = (f3 == 3'b000);
+        // FENCE.I identifies the instruction through funct3.  Its imm, rs1,
+        // and rd fields are reserved and must not make the instruction illegal.
+        OP_MISC_MEM: instruction_is_legal = (f3 == 3'b000) ||
+                                            (f3 == 3'b001);
         OP_SYSTEM: begin
           if (f3 == 3'b000)
             instruction_is_legal = (inst == 32'h0000_0073) ||
@@ -185,6 +189,7 @@ module control_unit (
     o_Ebreak     = 1'b0;
     o_Mret       = 1'b0;
     o_Wfi        = 1'b0;
+    o_FenceI     = 1'b0;
 
     case (opcode)
       // ======================================================================
@@ -336,6 +341,7 @@ module control_unit (
       OP_MISC_MEM: begin
         // This in-order core allows only one outstanding memory transaction,
         // so FENCE requires no additional datapath action.
+        o_FenceI = (i_instruction[14:12] == 3'b001);
       end
 
       // ======================================================================

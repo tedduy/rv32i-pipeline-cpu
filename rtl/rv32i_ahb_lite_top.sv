@@ -17,6 +17,7 @@ module rv32i_top #(
     input  logic i_irq_external,
 
     output logic o_core_sleep,
+    output logic o_fence_i,
 
     // Instruction AHB-Lite master
     output logic [N-1:0] o_iahb_haddr,
@@ -82,6 +83,7 @@ module rv32i_top #(
         .i_irq_timer(i_irq_timer),
         .i_irq_external(i_irq_external),
         .o_core_sleep(core_sleep),
+        .o_fence_i(o_fence_i),
         .o_imem_valid(imem_valid),
         .o_imem_addr(imem_addr),
         .i_imem_rdata(imem_rdata),
