@@ -82,6 +82,9 @@ module tb_branch_unit;
     rs1_data = -32'sd10; rs2_data = -32'sd20;
     check_branch(1'b0, "BLT: -10 < -20 (not taken)");
 
+    rs1_data = 32'h80000000; rs2_data = 32'h7fffffff;
+    check_branch(1'b1, "BLT: INT_MIN < INT_MAX (taken)");
+
     // Task 4: Test BGE (Branch if Greater or Equal - signed)
     $display("\n--- Task 4: BGE (Branch if Greater or Equal - signed) ---");
     branch_type = BRANCH_BGE;
@@ -94,6 +97,9 @@ module tb_branch_unit;
     rs1_data = -32'sd10; rs2_data = 32'd5;
     check_branch(1'b0, "BGE: -10 >= 5 (not taken)");
 
+    rs1_data = 32'h7fffffff; rs2_data = 32'h80000000;
+    check_branch(1'b1, "BGE: INT_MAX >= INT_MIN (taken)");
+
     // Task 5: Test BLTU (Branch if Less Than - unsigned)
     $display("\n--- Task 5: BLTU (Branch if Less Than - unsigned) ---");
     branch_type = BRANCH_BLTU;
@@ -103,6 +109,9 @@ module tb_branch_unit;
     rs1_data = 32'hFFFFFFFF; rs2_data = 32'd10;
     check_branch(1'b0, "BLTU: 0xFFFFFFFF < 10 (not taken, unsigned)");
 
+    rs1_data = 32'h00000000; rs2_data = 32'hffffffff;
+    check_branch(1'b1, "BLTU: 0 < UINT_MAX (taken)");
+
     // Task 6: Test BGEU (Branch if Greater or Equal - unsigned)
     $display("\n--- Task 6: BGEU (Branch if Greater or Equal - unsigned) ---");
     branch_type = BRANCH_BGEU;
@@ -111,6 +120,9 @@ module tb_branch_unit;
     
     rs1_data = 32'hFFFFFFFF; rs2_data = 32'd10;
     check_branch(1'b1, "BGEU: 0xFFFFFFFF >= 10 (taken, unsigned)");
+
+    rs1_data = 32'h80000000; rs2_data = 32'h80000000;
+    check_branch(1'b1, "BGEU: equal high-bit operands (taken)");
 
     // Task 7: Test branch_enable = 0
     $display("\n--- Task 7: Branch Enable = 0 ---");

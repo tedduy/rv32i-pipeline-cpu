@@ -17,28 +17,52 @@ module register_file #(
     output logic [N-1:0]               o_rdata1, o_rdata2
 );
 
-    integer i;
-    logic [N-1:0] regs [0:DEPTH - 1];
+    // Data flops do not need individual reset pins.  A small validity bitmap
+    // supplies the architectural reset view until each register is written.
+    // Besides reducing reset fanout, this makes the storage array compatible
+    // with implementations whose memory bits have no hardware reset.
+    logic [N-1:0] storage [0:DEPTH - 1];
+    logic [DEPTH-1:0] valid_q;
 
-    // Không dùng initial để ghi regs, tránh xung đột với always_ff
+    // Keep this architectural view as an array so verification code can still
+    // inspect id_regfile.regs[x] without observing uninitialized storage bits.
+    wire [N-1:0] regs [0:DEPTH - 1];
+
+    genvar reg_index;
+    generate
+        for (reg_index = 0; reg_index < DEPTH; reg_index = reg_index + 1) begin : gen_reg_view
+            if (reg_index == 0) begin : gen_x0
+                assign regs[reg_index] = '0;
+            end else if (reg_index == 1) begin : gen_x1
+                assign regs[reg_index] = valid_q[reg_index] ? storage[reg_index]
+                                                             : X1_INIT;
+            end else if (reg_index == 2) begin : gen_x2
+                assign regs[reg_index] = valid_q[reg_index] ? storage[reg_index]
+                                                             : X2_INIT;
+            end else if (reg_index == 4) begin : gen_x4
+                assign regs[reg_index] = valid_q[reg_index] ? storage[reg_index]
+                                                             : X4_INIT;
+            end else if (reg_index == 5) begin : gen_x5
+                assign regs[reg_index] = valid_q[reg_index] ? storage[reg_index]
+                                                             : X5_INIT;
+            end else begin : gen_zero_init
+                assign regs[reg_index] = valid_q[reg_index] ? storage[reg_index]
+                                                             : '0;
+            end
+        end
+    endgenerate
+
+    // The data array has no reset.  Only written words become observable.
+    always_ff @(posedge i_clk) begin
+        if (i_we && (i_waddr != '0))
+            storage[i_waddr] <= i_wdata;
+    end
+
     always_ff @(posedge i_clk or negedge i_arst_n) begin
-        if (!i_arst_n) begin
-            // Clear tất cả
-            for (i = 0; i < DEPTH; i = i + 1) begin
-                regs[i] <= '0;
-            end
-            // Đặt mặc định mong muốn
-            if (DEPTH > 1) regs[1] <= X1_INIT; // x1
-            if (DEPTH > 2) regs[2] <= X2_INIT; // x2
-            if (DEPTH > 4) regs[4] <= X4_INIT; // x4
-            if (DEPTH > 5) regs[5] <= X5_INIT; // x5
-        end
-        else begin
-            // Ghi đồng bộ, không cho ghi x0
-            if (i_we && (i_waddr != '0)) begin
-                regs[i_waddr] <= i_wdata;
-            end
-        end
+        if (!i_arst_n)
+            valid_q <= '0;
+        else if (i_we && (i_waddr != '0))
+            valid_q[i_waddr] <= 1'b1;
     end
 
     // Asynchronous reads with same-cycle WB-to-ID bypass. Without this

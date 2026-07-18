@@ -32,10 +32,8 @@ module forwarding_unit (
     // 11: Reserved (not used)
     // ==========================================================================
     
-    parameter [1:0]
-        FWD_NONE   = 2'b00,  // No forwarding
-        FWD_MEM_WB = 2'b01,  // Forward from MEM/WB
-        FWD_EX_MEM = 2'b10;  // Forward from EX/MEM
+    logic mem_rs1_match, mem_rs2_match;
+    logic wb_rs1_match, wb_rs2_match;
     
     // ==========================================================================
     // Forwarding Logic for ALU Operand A (rs1)
@@ -46,18 +44,14 @@ module forwarding_unit (
     // 3. No forwarding (use register file data)
     // ==========================================================================
     
-    always_comb begin
-        o_forward_a = FWD_NONE;
-        
-        // EX hazard: Forward from EX/MEM stage (highest priority)
-        if (i_mem_reg_write && (i_mem_rd_addr != 5'b0) && (i_mem_rd_addr == i_ex_rs1_addr)) begin
-            o_forward_a = FWD_EX_MEM;
-        end
-        // MEM hazard: Forward from MEM/WB stage
-        else if (i_wb_reg_write && (i_wb_rd_addr != 5'b0) && (i_wb_rd_addr == i_ex_rs1_addr)) begin
-            o_forward_a = FWD_MEM_WB;
-        end
-    end
+    assign mem_rs1_match = i_mem_reg_write && (i_mem_rd_addr != 5'b0) &&
+                           (i_mem_rd_addr == i_ex_rs1_addr);
+    assign wb_rs1_match = i_wb_reg_write && (i_wb_rd_addr != 5'b0) &&
+                          (i_wb_rd_addr == i_ex_rs1_addr);
+
+    // Bit 1 directly controls the fast EX/MEM bypass.  Suppress the older WB
+    // match only on bit 0 to preserve newest-result priority.
+    assign o_forward_a = {mem_rs1_match, wb_rs1_match && !mem_rs1_match};
     
     // ==========================================================================
     // Forwarding Logic for ALU Operand B (rs2)
@@ -66,17 +60,10 @@ module forwarding_unit (
     // Note: rs2 is also used for store data in Store instructions
     // ==========================================================================
     
-    always_comb begin
-        o_forward_b = FWD_NONE;
-        
-        // EX hazard: Forward from EX/MEM stage (highest priority)
-        if (i_mem_reg_write && (i_mem_rd_addr != 5'b0) && (i_mem_rd_addr == i_ex_rs2_addr)) begin
-            o_forward_b = FWD_EX_MEM;
-        end
-        // MEM hazard: Forward from MEM/WB stage
-        else if (i_wb_reg_write && (i_wb_rd_addr != 5'b0) && (i_wb_rd_addr == i_ex_rs2_addr)) begin
-            o_forward_b = FWD_MEM_WB;
-        end
-    end
+    assign mem_rs2_match = i_mem_reg_write && (i_mem_rd_addr != 5'b0) &&
+                           (i_mem_rd_addr == i_ex_rs2_addr);
+    assign wb_rs2_match = i_wb_reg_write && (i_wb_rd_addr != 5'b0) &&
+                          (i_wb_rd_addr == i_ex_rs2_addr);
+    assign o_forward_b = {mem_rs2_match, wb_rs2_match && !mem_rs2_match};
 
 endmodule

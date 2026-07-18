@@ -111,6 +111,21 @@ module tb_register_file;
     raddr1 = 5'd4; raddr2 = 5'd5;
     #1 check_read(32'h00000040, 32'h00000050, "Check x4 and x5 init values");
 
+    // Reset must restore the architectural view even though the underlying
+    // data storage intentionally has no reset pins.
+    arst_n = 1'b0;
+    #1;
+    raddr1 = 5'd3; raddr2 = 5'd7;
+    #1;
+    check_read(32'h00000000, 32'h00000000,
+               "Reset masks previously written storage");
+    arst_n = 1'b1;
+    #1;
+    raddr1 = 5'd1; raddr2 = 5'd5;
+    #1;
+    check_read(32'h00000010, 32'h00000050,
+               "Reset restores configured architectural values");
+
     // Summary
     @(posedge clk);
     $display("\n=== Test Summary ===");

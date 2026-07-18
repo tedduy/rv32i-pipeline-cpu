@@ -23,32 +23,11 @@ module alu_unit #(
     ALU_SLTU = 4'b0110,  // SLTU, SLTIU
     ALU_SLL  = 4'b0111,  // SLL, SLLI
     ALU_SRL  = 4'b1000,  // SRL, SRLI
-    ALU_SRA  = 4'b1001,  // SRA, SRAI
-    ALU_MUL  = 4'b1010,
-    ALU_MULH = 4'b1011,
-    ALU_MULHSU = 4'b1100,
-    ALU_MULHU = 4'b1101;
+    ALU_SRA  = 4'b1001;  // SRA, SRAI
 
   logic [N-1:0] result;
   logic [4:0] shamt;
-  logic signed [(2*N)-1:0] operand_a_signed;
-  logic signed [(2*N)-1:0] operand_b_signed;
-  logic signed [(2*N)-1:0] operand_b_unsigned_signed;
-  logic        [(2*N)-1:0] operand_a_unsigned;
-  logic        [(2*N)-1:0] operand_b_unsigned;
-  logic signed [(2*N)-1:0] product_ss;
-  logic signed [(2*N)-1:0] product_su;
-  logic        [(2*N)-1:0] product_uu;
-
   assign shamt = i_operand_b[4:0];
-  assign operand_a_signed          = {{N{i_operand_a[N-1]}}, i_operand_a};
-  assign operand_b_signed          = {{N{i_operand_b[N-1]}}, i_operand_b};
-  assign operand_b_unsigned_signed = $signed({{N{1'b0}}, i_operand_b});
-  assign operand_a_unsigned        = {{N{1'b0}}, i_operand_a};
-  assign operand_b_unsigned        = {{N{1'b0}}, i_operand_b};
-  assign product_ss = operand_a_signed * operand_b_signed;
-  assign product_su = operand_a_signed * operand_b_unsigned_signed;
-  assign product_uu = operand_a_unsigned * operand_b_unsigned;
 
   always_comb begin
     case (i_alu_ctrl)
@@ -62,10 +41,6 @@ module alu_unit #(
       ALU_SLL:  result = i_operand_a << shamt;
       ALU_SRL:  result = i_operand_a >> shamt;
       ALU_SRA:  result = $signed(i_operand_a) >>> shamt;
-      ALU_MUL:  result = product_uu[N-1:0];
-      ALU_MULH: result = product_ss[(2*N)-1:N];
-      ALU_MULHSU: result = product_su[(2*N)-1:N];
-      ALU_MULHU: result = product_uu[(2*N)-1:N];
       default:  result = 32'd0;
     endcase
   end

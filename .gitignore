@@ -40,6 +40,10 @@ verdiLog/
 novas.conf
 novas.rc
 
+# Synopsys synthesis artifacts
+alib-*/
+default.svf
+
 # Quartus generated directories
 fpga/**/db/
 fpga/**/incremental_db/

@@ -24,6 +24,7 @@ rtl/stages/decode/immediate_generator.sv
 rtl/stages/decode/register_file.sv
 
 rtl/stages/execute/alu_unit.sv
+rtl/stages/execute/iterative_multiplier.sv
 rtl/stages/execute/branch_unit.sv
 rtl/stages/execute/jump_unit.sv
 
@@ -63,6 +64,7 @@ tb/integration/tb_zmmul.sv
 tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv
+tb/unit/tb_multicycle_multiplier.sv
 tb/unit/tb_register_file.sv
 tb/unit/tb_immediate_generator.sv
 tb/unit/tb_branch_unit.sv

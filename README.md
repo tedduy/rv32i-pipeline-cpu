@@ -18,8 +18,10 @@ tham số top-level. Ba ngõ vào interrupt đồng bộ với clock hỗ trợ 
 software, timer và external interrupt.
 
 ISA hiện tại là RV32I cùng `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`. Zmmul cung
-cấp `MUL`, `MULH`, `MULHSU` và `MULHU`; các phép chia của full M extension chưa
-được triển khai.
+cấp `MUL`, `MULH`, `MULHSU` và `MULHU` qua multiplier iterative radix-2. Phần
+cứng dùng một bước shift-add mỗi chu kỳ và hoàn tất sau 32 chu kỳ, ưu tiên area
+nhỏ cho MCU hơn throughput MUL. Pipeline giữ instruction ở EX cho tới khi kết
+quả sẵn sàng. Các phép chia của full M extension chưa được triển khai.
 
 Illegal instruction, truy cập CSR không được hỗ trợ, địa chỉ load/store lệch
 alignment và target branch/jump lệch `IALIGN=32` đều tạo precise exception trước
@@ -204,6 +206,42 @@ make firmware-run
 Firmware báo pass bằng cách ghi giá trị `1` tới thanh ghi trạng thái mô phỏng
 tại `0x2000_0000`. Exception hoặc interrupt ngoài dự kiến đi vào `trap_entry`
 và báo fail.
+
+## Synthesis với Design Compiler
+
+Flow tại [`synth/dc/run.tcl`](synth/dc/run.tcl) tổng hợp trực tiếp RTL hiện tại,
+tạo netlist và các báo cáo area, timing, QoR trong `build/synth/dc/`. Mặc định
+flow tổng hợp native core `rv32i_core` với clock 10 ns (100 MHz):
+
+```bash
+make synth-dc
+
+# Bao gồm hai bridge AHB-Lite của public top
+make synth-dc-ahb
+```
+
+Multiplier radix-2 có thanh ghi accumulator, multiplicand và multiplier nội
+bộ. Mỗi bước phải đóng timing trong một clock bình thường; flow không áp dụng
+multicycle timing exception cho datapath này. Báo cáo riêng
+`timing_multiplier.rpt` kiểm tra các đường timing bên trong multiplier.
+
+Mặc định project dùng Sky130 HD tại corner `tt, 25 C, 1.80 V` thông qua symlink
+`.tools/pdk-sky130`. Trên máy hiện tại, tạo liên kết tới PDK dùng chung bằng:
+
+```bash
+ln -s /home/shared/PDK/pdk-sky130 .tools/pdk-sky130
+```
+
+Có thể chọn corner hoặc standard-cell library khác bằng cách override:
+
+```bash
+make synth-dc \
+  SYNTH_LIBRARY=/path/to/standard_cells.db \
+  SYNTH_CLOCK_PERIOD=10.0
+```
+
+Kết quả chính nằm trong `build/synth/dc/rv32i_core/reports/`; netlist và SDC nằm
+trong `build/synth/dc/rv32i_core/netlist/`.
 
 ## FPGA
 

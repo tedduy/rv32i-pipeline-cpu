@@ -5,7 +5,7 @@
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
 	vcs vcs-compile vcs-run vcs-gui vcs-regression verdi act-tools-check act-generate act-compile act-run \
 	act-regression act-zicsr act-zifencei act-zicntr act-zmmul act-sm-prepare act-sm-generate act-sm-exceptions \
-	firmware-build firmware-run distclean
+	firmware-build firmware-run synth-dc synth-dc-ahb distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -66,6 +66,17 @@ FW_CFLAGS = -march=$(FW_ARCH) -mabi=ilp32 -mcmodel=medlow -msmall-data-limit=0 \
 FW_LDFLAGS = -nostdlib -nostartfiles -Wl,--gc-sections,--no-relax \
 	-Wl,-Map,$(FW_BUILD_DIR)/smoke.map -T $(FW_DIR)/linker.ld
 
+# Design Compiler baseline using the project-local symlink to the shared
+# Sky130 HD PDK. Override the corner or library path when needed.
+DC_SHELL ?= dc_shell
+SYNTH_TOP ?= rv32i_core
+SYNTH_CLOCK_PERIOD ?= 10.0
+SKY130_PDK_ROOT ?= $(CURDIR)/.tools/pdk-sky130
+SKY130_DB_DIR ?= $(SKY130_PDK_ROOT)/synopsys_skywater_flow_nominal/sky130_db
+SYNTH_LIBRARY ?= $(SKY130_DB_DIR)/sky130_fd_sc_hd__tt_025C_1v80.db
+SYNTH_OUTPUT_DIR ?= $(CURDIR)/build/synth/dc/$(SYNTH_TOP)
+SYNTH_SCRIPT = synth/dc/run.tcl
+
 # Compile flags
 VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
 VLOG_GL_FLAGS = +acc -work $(WORK_GL_DIR)
@@ -94,7 +105,7 @@ SKY130_LIB = $(PDK_ROOT)/sky130B/libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_h
 PIPELINE_WAVE = wave_tb_rv32i_pipeline.do
 
 # Unit test list
-UNIT_TESTS = tb_alu_unit tb_register_file tb_immediate_generator tb_branch_unit \
+UNIT_TESTS = tb_alu_unit tb_multicycle_multiplier tb_register_file tb_immediate_generator tb_branch_unit \
              tb_jump_unit tb_load_store_unit tb_control_unit tb_program_counter \
              tb_instruction_memory tb_data_memory
 UNIT_TESTS += tb_native_to_ahb_lite
@@ -155,6 +166,11 @@ help:
 	@echo "Bare-metal Firmware Commands:"
 	@echo "  make firmware-build    - Build the freestanding C smoke-test ELF"
 	@echo "  make firmware-run      - Build and run the C firmware with VCS"
+	@echo ""
+	@echo "Synthesis Commands:"
+	@echo "  make synth-dc          - Synthesize rv32i_core at 100 MHz with DC"
+	@echo "  make synth-dc-ahb      - Synthesize public rv32i_top including AHB bridges"
+	@echo "  Override SYNTH_LIBRARY=/path/to/technology.db SYNTH_CLOCK_PERIOD=<ns>"
 	@echo ""
 	@echo "Gate-Level Simulation Commands:"
 	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
@@ -397,6 +413,32 @@ firmware-run: firmware-build act-compile
 		--simv "$(VCS_BUILD_ROOT)/tb_act/simv" \
 		--work-dir "$(FW_BUILD_DIR)" --max-cycles 100000 \
 		--suite-name "Firmware smoke test"
+
+# Technology-mapped baseline synthesis. Generated reports/netlists stay below
+# build/ and are not mixed with the checked-in historical ASIC netlist.
+synth-dc:
+	@command -v "$(DC_SHELL)" >/dev/null 2>&1 || { \
+		echo "Missing Design Compiler executable: $(DC_SHELL)"; exit 1; \
+	}
+	@test -f "$(SYNTH_LIBRARY)" || { \
+		echo "Missing target library: $(SYNTH_LIBRARY)"; exit 1; \
+	}
+	@mkdir -p "$(SYNTH_OUTPUT_DIR)"
+	@echo "=========================================="
+	@echo "Design Compiler synthesis: $(SYNTH_TOP)"
+	@echo "Clock: $(SYNTH_CLOCK_PERIOD) ns"
+	@echo "Library: $(SYNTH_LIBRARY)"
+	@echo "=========================================="
+	@env SYNTH_TOP="$(SYNTH_TOP)" \
+		SYNTH_LIBRARY="$(abspath $(SYNTH_LIBRARY))" \
+		SYNTH_OUTPUT_DIR="$(abspath $(SYNTH_OUTPUT_DIR))" \
+		SYNTH_CLOCK_PERIOD="$(SYNTH_CLOCK_PERIOD)" \
+		"$(DC_SHELL)" -f "$(SYNTH_SCRIPT)" \
+		-output_log_file "$(SYNTH_OUTPUT_DIR)/dc.log"
+
+synth-dc-ahb:
+	@$(MAKE) --no-print-directory synth-dc SYNTH_TOP=rv32i_top \
+		SYNTH_OUTPUT_DIR="$(CURDIR)/build/synth/dc/rv32i_top"
 
 # Compile the generated Sky130 netlist independently from RTL.
 gl-compile:

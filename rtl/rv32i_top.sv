@@ -152,7 +152,11 @@ module rv32i_core #(
     logic         ex_branch_taken;
     logic [N-1:0] ex_jump_target, ex_return_addr;
     logic [N-1:0] ex_rs2_data_forwarded;  // For store operations
+    logic [N-1:0] ex_data_addr;
+    logic [N-1:0] ex_mul_result;
     logic [N-1:0] ex_result;
+    logic         ex_is_mul, mul_start, mul_busy, mul_done;
+    logic         mul_stall, mul_consume;
 
     // Machine-mode CSR/trap signals
     logic [11:0]  ex_csr_addr;
@@ -228,7 +232,7 @@ module rv32i_core #(
     logic hazard_flush_id_ex, hazard_flush_if_id;
     logic csr_order_stall;
     logic pipeline_flush_id_ex, pipeline_flush_if_id;
-    logic imem_wait, dmem_wait, memory_stall;
+    logic imem_wait, dmem_wait, bus_stall, memory_stall;
     logic dmem_request, dmem_complete, dmem_error_pending;
     logic [N-1:0] dmem_rdata_latched, dmem_response_rdata;
     
@@ -317,7 +321,8 @@ module rv32i_core #(
     assign dmem_response_rdata = dmem_complete ? dmem_rdata_latched
                                                 : i_dmem_rdata;
     assign dmem_wait      = o_dmem_valid && !i_dmem_ready;
-    assign memory_stall   = imem_wait || dmem_wait;
+    assign bus_stall      = imem_wait || dmem_wait;
+    assign memory_stall   = bus_stall || mul_stall;
     assign W_stall        = stall_if_id || memory_stall;
     assign W_flush        = pipeline_flush_id_ex | pipeline_flush_if_id;
     assign W_immediate    = wb_immediate;
@@ -615,7 +620,11 @@ module rv32i_core #(
         .i_ex_rs1_addr(ex_rs1_addr),
         .i_ex_rs2_addr(ex_rs2_addr),
         .i_mem_rd_addr(mem_rd_addr),
-        .i_mem_reg_write(mem_valid && mem_reg_write && !data_access_exception),
+        // A load result is available from the registered WB path after the
+        // mandatory load-use bubble.  Do not feed the combinational DMEM
+        // response into EX/MEM forwarding; besides being unnecessary, that
+        // creates a bus-response -> forwarding -> ALU critical path.
+        .i_mem_reg_write(mem_valid && mem_reg_write && (mem_wb_sel != 2'b01)),
         .i_wb_rd_addr(wb_rd_addr),
         .i_wb_reg_write(wb_valid && wb_reg_write),
         .o_forward_a(forward_a),
@@ -624,11 +633,14 @@ module rv32i_core #(
 
     // EX/MEM forwarding must use the value that the instruction will
     // architecturally write, not always the ALU output.  This matters for LUI
-    // (immediate), JAL/JALR (PC+4), and loads (memory data).
+    // (immediate) and JAL/JALR (PC+4).  Loads are deliberately excluded from
+    // EX/MEM forwarding and use the registered WB result after their bubble.
     always_comb begin
         unique case (mem_wb_sel)
             2'b00:   mem_forward_data = mem_alu_result;
-            2'b01:   mem_forward_data = mem_load_data;
+            // The value is unobserved for loads.  Selecting the ALU result
+            // keeps combinational DMEM read data out of the EX datapath.
+            2'b01:   mem_forward_data = mem_alu_result;
             2'b10:   mem_forward_data = mem_return_addr;
             2'b11:   mem_forward_data = mem_immediate;
             default: mem_forward_data = mem_alu_result;
@@ -658,6 +670,26 @@ module rv32i_core #(
     
     // ALU operand B selection (immediate or rs2)
     assign ex_alu_operand_b = ex_alu_src ? ex_immediate : ex_rs2_data_forwarded;
+
+    assign ex_is_mul = ex_valid && !ex_instruction_access_fault &&
+                       (ex_alu_ctrl >= 4'b1010) &&
+                       (ex_alu_ctrl <= 4'b1101);
+    assign mul_start   = ex_is_mul && !mul_busy && !mul_done;
+    assign mul_stall   = ex_is_mul && !mul_done;
+    assign mul_consume = ex_is_mul && mul_done && !bus_stall;
+
+    iterative_multiplier #(.N(N)) ex_multiplier (
+        .i_clk(i_clk),
+        .i_arst_n(i_arst_n),
+        .i_start(mul_start),
+        .i_consume(mul_consume),
+        .i_operand_a(ex_alu_operand_a),
+        .i_operand_b(ex_alu_operand_b),
+        .i_alu_ctrl(ex_alu_ctrl),
+        .o_busy(mul_busy),
+        .o_done(mul_done),
+        .o_result(ex_mul_result)
+    );
     
     // ALU Unit
     alu_unit #(.N(N)) ex_alu (
@@ -718,7 +750,14 @@ module rv32i_core #(
     assign csr_write = ex_valid && csr_write_intent && csr_valid && csr_writable &&
                        !memory_stall && !ex_instruction_access_fault &&
                        !data_access_exception;
-    assign ex_result = ex_csr_en ? ex_csr_rdata : ex_alu_result;
+    // Keep load/store address generation out of the general ALU result mux.
+    // In particular, a misalignment trap must not depend on the multiplier
+    // cone merely because MUL shares the same ALU output bus.
+    assign ex_data_addr = ex_alu_operand_a_forwarded + ex_immediate;
+    assign ex_result = ex_is_mul ? ex_mul_result :
+                       ex_csr_en ? ex_csr_rdata :
+                       (ex_mem_read || ex_mem_write) ? ex_data_addr :
+                                                      ex_alu_result;
 
     assign control_transfer_target = ex_branch_taken ? ex_pc_branch_target
                                                       : ex_jump_target;
@@ -728,8 +767,8 @@ module rv32i_core #(
 
     always_comb begin
         unique case (ex_mem_type)
-            3'b001, 3'b101: data_addr_misaligned = ex_alu_result[0];
-            3'b010:         data_addr_misaligned = |ex_alu_result[1:0];
+            3'b001, 3'b101: data_addr_misaligned = ex_data_addr[0];
+            3'b010:         data_addr_misaligned = |ex_data_addr[1:0];
             default:        data_addr_misaligned = 1'b0;
         endcase
     end
@@ -804,10 +843,10 @@ module rv32i_core #(
             trap_cause = {{(N-2){1'b0}}, 2'd3};
         end else if (load_misaligned_exception) begin
             trap_cause = {{(N-3){1'b0}}, 3'd4};
-            trap_value = ex_alu_result;
+            trap_value = ex_data_addr;
         end else if (store_misaligned_exception) begin
             trap_cause = {{(N-3){1'b0}}, 3'd6};
-            trap_value = ex_alu_result;
+            trap_value = ex_data_addr;
         end
     end
 

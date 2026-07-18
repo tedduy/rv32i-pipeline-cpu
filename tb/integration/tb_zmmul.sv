@@ -78,7 +78,7 @@ module tb_zmmul;
     end
 
     initial begin
-        repeat (100) @(posedge clk);
+        repeat (300) @(posedge clk);
         $fatal(1, "Timeout waiting for Zmmul test");
     end
 
