@@ -27,6 +27,8 @@ module rv32i_top #(
     output logic [N-1:0] o_imem_addr,
     input  logic [N-1:0] i_imem_rdata,
     input  logic         i_imem_ready,
+    // Error qualifies an accepted response (valid && ready).
+    input  logic         i_imem_error,
 
     // External data memory interface
     output logic         o_dmem_valid,
@@ -37,6 +39,8 @@ module rv32i_top #(
     output logic [3:0]   o_dmem_wstrb,
     input  logic [N-1:0] i_dmem_rdata,
     input  logic         i_dmem_ready,
+    // Error qualifies an accepted response (valid && ready).
+    input  logic         i_dmem_error,
 
     // Architectural commit/retire interface
     output logic         o_commit_valid,
@@ -87,6 +91,7 @@ module rv32i_top #(
     // IF/ID Pipeline Register Signals
     // ==========================================================================
     logic         id_valid;
+    logic         id_instruction_access_fault;
     logic [N-1:0] id_pc, id_instruction;
     
     // ==========================================================================
@@ -114,6 +119,7 @@ module rv32i_top #(
     // ID/EX Pipeline Register Signals
     // ==========================================================================
     logic         ex_valid;
+    logic         ex_instruction_access_fault;
     logic [N-1:0] ex_pc, ex_instruction;
     logic [N-1:0] ex_rs1_data, ex_rs2_data, ex_immediate;
     logic [4:0]   ex_rs1_addr, ex_rs2_addr, ex_rd_addr;
@@ -149,15 +155,19 @@ module rv32i_top #(
     logic [N-1:0] csr_mtvec, csr_mepc;
     logic         csr_write, csr_write_intent;
     logic         csr_valid, csr_writable, csr_access_illegal;
-    logic         sync_trap, irq_take, trap_enter, mret_taken, system_redirect;
+    logic         ex_sync_trap, irq_take, trap_enter, mret_taken, system_redirect;
     logic         csr_irq_pending;
     logic [N-1:0] csr_irq_cause, trap_cause, trap_value;
+    logic [N-1:0] trap_pc;
     logic [N-1:0] system_redirect_pc;
     logic [N-1:0] control_transfer_target;
     logic         instruction_addr_misaligned;
     logic         data_addr_misaligned;
     logic         illegal_exception, load_misaligned_exception;
     logic         store_misaligned_exception;
+    logic         instruction_access_exception;
+    logic         load_access_exception, store_access_exception;
+    logic         data_access_exception;
     
     // ==========================================================================
     // EX/MEM Pipeline Register Signals
@@ -210,7 +220,7 @@ module rv32i_top #(
     logic stall_pc, stall_if_id, flush_id_ex, flush_if_id;
     logic pipeline_flush_id_ex, pipeline_flush_if_id;
     logic imem_wait, dmem_wait, memory_stall;
-    logic dmem_request, dmem_complete;
+    logic dmem_request, dmem_complete, dmem_error_pending;
     
     // ==========================================================================
     // Forwarding Signals
@@ -266,7 +276,7 @@ module rv32i_top #(
     assign W_ALUout       = wb_alu_result;
     assign W_WB_data      = wb_data;
     assign W_rd_addr      = wb_rd_addr;
-    assign W_reg_write    = wb_reg_write && !memory_stall;
+    assign W_reg_write    = wb_valid && wb_reg_write && !memory_stall;
     assign W_mem_write    = mem_mem_write;
     assign W_mem_read     = mem_mem_read;
     
@@ -358,12 +368,16 @@ module rv32i_top #(
     // Remember that completion so a store is not accepted more than once while
     // the pipeline remains frozen by the outstanding instruction request.
     always_ff @(posedge i_clk or negedge i_arst_n) begin
-        if (!i_arst_n)
+        if (!i_arst_n) begin
             dmem_complete <= 1'b0;
-        else if (!dmem_request || !memory_stall)
+            dmem_error_pending <= 1'b0;
+        end else if (!dmem_request || !memory_stall) begin
             dmem_complete <= 1'b0;
-        else if (o_dmem_valid && i_dmem_ready)
+            dmem_error_pending <= 1'b0;
+        end else if (o_dmem_valid && i_dmem_ready) begin
             dmem_complete <= 1'b1;
+            dmem_error_pending <= (i_dmem_error === 1'b1);
+        end
     end
     
     // ==========================================================================
@@ -376,9 +390,12 @@ module rv32i_top #(
         .i_stall(stall_if_id || memory_stall),
         .i_flush(pipeline_flush_if_id),
         .i_valid(o_imem_valid && i_imem_ready),
+        .i_access_fault(o_imem_valid && i_imem_ready &&
+                        (i_imem_error === 1'b1)),
         .i_pc(if_pc_current),
         .i_instruction(if_instruction),
         .o_valid(id_valid),
+        .o_access_fault(id_instruction_access_fault),
         .o_pc(id_pc),
         .o_instruction(id_instruction)
     );
@@ -425,7 +442,7 @@ module rv32i_top #(
     ) id_regfile (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_we(wb_reg_write && !memory_stall),
+        .i_we(wb_valid && wb_reg_write && !memory_stall),
         .i_raddr1(id_rs1_addr),
         .i_raddr2(id_rs2_addr),
         .i_waddr(wb_rd_addr),
@@ -472,6 +489,7 @@ module rv32i_top #(
         .i_stall(memory_stall),
         .i_flush(pipeline_flush_id_ex),
         .i_valid(id_valid),
+        .i_access_fault(id_instruction_access_fault),
         .i_pc(id_pc),
         .i_instruction(id_instruction),
         .i_rs1_data(id_rs1_data),
@@ -501,6 +519,7 @@ module rv32i_top #(
         .i_mret(id_mret),
         .i_illegal(id_illegal),
         .o_valid(ex_valid),
+        .o_access_fault(ex_instruction_access_fault),
         .o_pc(ex_pc),
         .o_instruction(ex_instruction),
         .o_rs1_data(ex_rs1_data),
@@ -556,9 +575,9 @@ module rv32i_top #(
         .i_ex_rs1_addr(ex_rs1_addr),
         .i_ex_rs2_addr(ex_rs2_addr),
         .i_mem_rd_addr(mem_rd_addr),
-        .i_mem_reg_write(mem_reg_write),
+        .i_mem_reg_write(mem_valid && mem_reg_write && !data_access_exception),
         .i_wb_rd_addr(wb_rd_addr),
-        .i_wb_reg_write(wb_reg_write),
+        .i_wb_reg_write(wb_valid && wb_reg_write),
         .o_forward_a(forward_a),
         .o_forward_b(forward_b)
     );
@@ -657,7 +676,8 @@ module rv32i_top #(
     assign csr_access_illegal = ex_valid && ex_csr_en &&
                                 (!csr_valid || (csr_write_intent && !csr_writable));
     assign csr_write = ex_valid && csr_write_intent && csr_valid && csr_writable &&
-                       !memory_stall;
+                       !memory_stall && !ex_instruction_access_fault &&
+                       !data_access_exception;
     assign ex_result = ex_csr_en ? ex_csr_rdata : ex_alu_result;
 
     assign control_transfer_target = ex_branch_taken ? ex_pc_branch_target
@@ -675,15 +695,29 @@ module rv32i_top #(
     end
 
     assign illegal_exception = ex_valid && (ex_illegal || csr_access_illegal);
+    assign instruction_access_exception = ex_valid && ex_instruction_access_fault;
     assign load_misaligned_exception = ex_valid && ex_mem_read && data_addr_misaligned;
     assign store_misaligned_exception = ex_valid && ex_mem_write && data_addr_misaligned;
-    assign sync_trap = !memory_stall &&
-                       (illegal_exception || instruction_addr_misaligned ||
+    assign load_access_exception = mem_valid && mem_mem_read &&
+                                   !memory_stall &&
+                                   (dmem_error_pending ||
+                                    (o_dmem_valid && i_dmem_ready &&
+                                     (i_dmem_error === 1'b1)));
+    assign store_access_exception = mem_valid && mem_mem_write &&
+                                    !memory_stall &&
+                                    (dmem_error_pending ||
+                                     (o_dmem_valid && i_dmem_ready &&
+                                      (i_dmem_error === 1'b1)));
+    assign data_access_exception = load_access_exception || store_access_exception;
+    assign ex_sync_trap = !memory_stall &&
+                       (instruction_access_exception || illegal_exception ||
+                        instruction_addr_misaligned ||
                         (ex_valid && ex_ebreak) || load_misaligned_exception ||
                         store_misaligned_exception || (ex_valid && ex_ecall));
-    assign irq_take = ex_valid && csr_irq_pending && !sync_trap && !memory_stall;
-    assign trap_enter = sync_trap || irq_take;
-    assign mret_taken = ex_valid && ex_mret && !memory_stall;
+    assign irq_take = ex_valid && csr_irq_pending && !data_access_exception &&
+                      !ex_sync_trap && !memory_stall;
+    assign trap_enter = data_access_exception || ex_sync_trap || irq_take;
+    assign mret_taken = ex_valid && ex_mret && !data_access_exception && !memory_stall;
     assign system_redirect = trap_enter || mret_taken;
     assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00}
                                            : {csr_mepc[N-1:2], 2'b00};
@@ -691,8 +725,20 @@ module rv32i_top #(
     always_comb begin
         trap_cause = {{(N-4){1'b0}}, 4'd11};
         trap_value = '0;
-        if (irq_take) begin
+        trap_pc    = ex_pc;
+        if (load_access_exception) begin
+            trap_pc    = mem_pc;
+            trap_cause = {{(N-3){1'b0}}, 3'd5};
+            trap_value = mem_alu_result;
+        end else if (store_access_exception) begin
+            trap_pc    = mem_pc;
+            trap_cause = {{(N-3){1'b0}}, 3'd7};
+            trap_value = mem_alu_result;
+        end else if (irq_take) begin
             trap_cause = csr_irq_cause;
+        end else if (instruction_access_exception) begin
+            trap_cause = {{(N-1){1'b0}}, 1'b1};
+            trap_value = ex_pc;
         end else if (illegal_exception) begin
             trap_cause = {{(N-2){1'b0}}, 2'd2};
             trap_value = ex_instruction;
@@ -727,7 +773,7 @@ module rv32i_top #(
         .i_csr_write(csr_write),
         .i_csr_wdata(ex_csr_wdata),
         .i_trap_enter(trap_enter),
-        .i_trap_pc(ex_pc),
+        .i_trap_pc(trap_pc),
         .i_trap_cause(trap_cause),
         .i_trap_value(trap_value),
         .i_mret(mret_taken),
@@ -827,7 +873,7 @@ module rv32i_top #(
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_stall(memory_stall),
-        .i_valid(mem_valid),
+        .i_valid(mem_valid && !data_access_exception),
         .i_pc(mem_pc),
         .i_instruction(mem_instruction),
         .i_alu_result(mem_alu_result),

@@ -51,6 +51,7 @@ tb/integration/tb_machine_csr_trap.sv
 tb/integration/tb_machine_external_interrupt.sv
 tb/integration/tb_machine_exceptions.sv
 tb/integration/tb_machine_identification_csrs.sv
+tb/integration/tb_bus_access_faults.sv
 tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv

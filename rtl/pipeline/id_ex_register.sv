@@ -15,6 +15,7 @@ module id_ex_register #(
     
     // Inputs from ID stage
     input  logic             i_valid,
+    input  logic             i_access_fault,
     input  logic [N-1:0]     i_pc,
     input  logic [N-1:0]     i_instruction,
     input  logic [N-1:0]     i_rs1_data,
@@ -48,6 +49,7 @@ module id_ex_register #(
     
     // Outputs to EX stage
     output logic             o_valid,
+    output logic             o_access_fault,
     output logic [N-1:0]     o_pc,
     output logic [N-1:0]     o_instruction,
     output logic [N-1:0]     o_rs1_data,
@@ -84,6 +86,7 @@ module id_ex_register #(
         if (!i_arst_n) begin
             // Reset: Clear all signals
             o_valid       <= 1'b0;
+            o_access_fault <= 1'b0;
             o_pc          <= 32'h0;
             o_instruction <= 32'h00000013;
             o_rs1_data    <= 32'h0;
@@ -121,6 +124,7 @@ module id_ex_register #(
         else if (i_flush) begin
             // Flush: Insert bubble (clear control signals but keep data)
             o_valid       <= 1'b0;
+            o_access_fault <= 1'b0;
             o_pc          <= 32'h0;
             o_instruction <= 32'h00000013;
             o_rs1_data    <= 32'h0;
@@ -155,6 +159,7 @@ module id_ex_register #(
         else begin
             // Normal operation: Pass data through
             o_valid       <= i_valid;
+            o_access_fault <= i_access_fault;
             o_pc          <= i_pc;
             o_instruction <= i_instruction;
             o_rs1_data    <= i_rs1_data;

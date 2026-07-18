@@ -85,6 +85,7 @@ INTEGRATION_TESTS = tb_rv32i_pipeline tb_full_verification tb_load_use_hazard \
                     tb_memory_wait_states tb_reset_vector tb_commit_interface \
                     tb_machine_csr_trap tb_machine_external_interrupt \
                     tb_machine_exceptions tb_machine_identification_csrs
+INTEGRATION_TESTS += tb_bus_access_faults
 
 VCS_REGRESSION_TESTS = $(UNIT_TESTS) $(INTEGRATION_TESTS)
 
@@ -154,6 +155,7 @@ help:
 	@echo "  tb_machine_external_interrupt"
 	@echo "  tb_machine_exceptions"
 	@echo "  tb_machine_identification_csrs"
+	@echo "  tb_bus_access_faults"
 	@echo ""
 	@echo "Gate-Level:"
 	@echo "  Run 3 (Best Config) - 0.81mm², 50MHz, 0 DRC violations"
