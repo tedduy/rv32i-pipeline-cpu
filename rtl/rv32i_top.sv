@@ -22,6 +22,8 @@ module rv32i_core #(
     input  logic i_irq_timer,
     input  logic i_irq_external,
 
+    output logic o_core_sleep,
+
     // External instruction memory interface
     output logic         o_imem_valid,
     output logic [N-1:0] o_imem_addr,
@@ -114,7 +116,7 @@ module rv32i_core #(
     logic        id_jal, id_jalr;
     logic        id_csr_en, id_csr_imm;
     logic [1:0]  id_csr_op;
-    logic        id_ecall, id_ebreak, id_mret, id_illegal;
+    logic        id_ecall, id_ebreak, id_mret, id_wfi, id_illegal;
     
     // ==========================================================================
     // ID/EX Pipeline Register Signals
@@ -133,7 +135,7 @@ module rv32i_core #(
     logic         ex_jal, ex_jalr;
     logic         ex_csr_en, ex_csr_imm;
     logic [1:0]   ex_csr_op;
-    logic         ex_ecall, ex_ebreak, ex_mret, ex_illegal;
+    logic         ex_ecall, ex_ebreak, ex_mret, ex_wfi, ex_illegal;
     // Debug: Original register values for tracking
     logic [N-1:0] ex_rd1_orig, ex_rd2_orig;
     
@@ -156,8 +158,9 @@ module rv32i_core #(
     logic [N-1:0] csr_mtvec, csr_mepc;
     logic         csr_write, csr_write_intent;
     logic         csr_valid, csr_writable, csr_access_illegal;
-    logic         ex_sync_trap, irq_take, trap_enter, mret_taken, system_redirect;
-    logic         csr_irq_pending;
+    logic         ex_sync_trap, irq_take, trap_enter, mret_taken, wfi_sleep;
+    logic         system_redirect, core_sleep;
+    logic         csr_irq_pending, csr_wake_pending;
     logic [N-1:0] csr_irq_cause, trap_cause, trap_value;
     logic [N-1:0] trap_pc;
     logic [N-1:0] system_redirect_pc;
@@ -222,6 +225,7 @@ module rv32i_core #(
     logic pipeline_flush_id_ex, pipeline_flush_if_id;
     logic imem_wait, dmem_wait, memory_stall;
     logic dmem_request, dmem_complete, dmem_error_pending;
+    logic [N-1:0] dmem_rdata_latched, dmem_response_rdata;
     
     // ==========================================================================
     // Forwarding Signals
@@ -290,7 +294,8 @@ module rv32i_core #(
     assign W_mem_wdata    = mem_store_data;
     assign W_mem_rdata    = mem_load_data;
 
-    assign o_imem_valid   = i_arst_n;
+    assign o_imem_valid   = i_arst_n && !core_sleep;
+    assign o_core_sleep   = core_sleep;
     assign imem_wait      = o_imem_valid && !i_imem_ready;
 
     assign dmem_request   = mem_mem_read || mem_mem_write;
@@ -303,6 +308,8 @@ module rv32i_core #(
     assign o_dmem_size    = (mem_mem_type == 3'b010) ? 2'd2 :
                             ((mem_mem_type == 3'b001) ||
                              (mem_mem_type == 3'b101)) ? 2'd1 : 2'd0;
+    assign dmem_response_rdata = dmem_complete ? dmem_rdata_latched
+                                                : i_dmem_rdata;
     assign dmem_wait      = o_dmem_valid && !i_dmem_ready;
     assign memory_stall   = imem_wait || dmem_wait;
     assign W_stall        = stall_if_id || memory_stall;
@@ -358,7 +365,7 @@ module rv32i_core #(
     ) if_pc_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_PC((memory_stall || (stall_pc && !system_redirect)) ?
+        .i_PC((core_sleep || memory_stall || (stall_pc && !system_redirect)) ?
               if_pc_current : if_pc_next),
         .o_PC(if_pc_current)
     );
@@ -369,18 +376,20 @@ module rv32i_core #(
     assign if_instruction = i_imem_rdata;
 
     // A data transfer can finish while the instruction side is still waiting.
-    // Remember that completion so a store is not accepted more than once while
-    // the pipeline remains frozen by the outstanding instruction request.
+    // Remember completion, error and read data until the global pipeline can
+    // advance; this also prevents a store from being accepted more than once.
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n) begin
             dmem_complete <= 1'b0;
             dmem_error_pending <= 1'b0;
+            dmem_rdata_latched <= '0;
         end else if (!dmem_request || !memory_stall) begin
             dmem_complete <= 1'b0;
             dmem_error_pending <= 1'b0;
         end else if (o_dmem_valid && i_dmem_ready) begin
             dmem_complete <= 1'b1;
             dmem_error_pending <= (i_dmem_error === 1'b1);
+            dmem_rdata_latched <= i_dmem_rdata;
         end
     end
     
@@ -436,6 +445,7 @@ module rv32i_core #(
         .o_Ecall(id_ecall),
         .o_Ebreak(id_ebreak),
         .o_Mret(id_mret),
+        .o_Wfi(id_wfi),
         .o_Illegal(id_illegal)
     );
     
@@ -521,6 +531,7 @@ module rv32i_core #(
         .i_ecall(id_ecall),
         .i_ebreak(id_ebreak),
         .i_mret(id_mret),
+        .i_wfi(id_wfi),
         .i_illegal(id_illegal),
         .o_valid(ex_valid),
         .o_access_fault(ex_instruction_access_fault),
@@ -551,6 +562,7 @@ module rv32i_core #(
         .o_ecall(ex_ecall),
         .o_ebreak(ex_ebreak),
         .o_mret(ex_mret),
+        .o_wfi(ex_wfi),
         .o_illegal(ex_illegal)
     );
     
@@ -722,9 +734,22 @@ module rv32i_core #(
                       !ex_sync_trap && !memory_stall;
     assign trap_enter = data_access_exception || ex_sync_trap || irq_take;
     assign mret_taken = ex_valid && ex_mret && !data_access_exception && !memory_stall;
-    assign system_redirect = trap_enter || mret_taken;
-    assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00}
-                                           : {csr_mepc[N-1:2], 2'b00};
+    assign wfi_sleep = ex_valid && ex_wfi && !data_access_exception &&
+                       !ex_sync_trap && !irq_take && !memory_stall &&
+                       !csr_wake_pending;
+    assign system_redirect = trap_enter || mret_taken || wfi_sleep;
+    assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00} :
+                                mret_taken ? {csr_mepc[N-1:2], 2'b00} :
+                                             ex_pc + {{(N-3){1'b0}}, 3'd4};
+
+    always_ff @(posedge i_clk or negedge i_arst_n) begin
+        if (!i_arst_n)
+            core_sleep <= 1'b0;
+        else if (core_sleep && csr_wake_pending)
+            core_sleep <= 1'b0;
+        else if (wfi_sleep)
+            core_sleep <= 1'b1;
+    end
 
     always_comb begin
         trap_cause = {{(N-4){1'b0}}, 4'd11};
@@ -788,6 +813,7 @@ module rv32i_core #(
         .o_mtvec(csr_mtvec),
         .o_mepc(csr_mepc),
         .o_irq_pending(csr_irq_pending),
+        .o_wake_pending(csr_wake_pending),
         .o_irq_cause(csr_irq_cause)
     );
     
@@ -862,7 +888,7 @@ module rv32i_core #(
         .i_mem_read(mem_mem_read),
         .i_mem_write(mem_mem_write),
         .i_byte_offset(mem_alu_result[1:0]),
-        .i_mem_read_data(i_dmem_rdata),
+        .i_mem_read_data(dmem_response_rdata),
         .i_store_data(mem_rs2_data),
         .o_load_data(mem_load_data),
         .o_store_data(mem_store_data),

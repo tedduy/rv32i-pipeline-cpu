@@ -56,6 +56,7 @@ tb/integration/tb_machine_exceptions.sv
 tb/integration/tb_machine_identification_csrs.sv
 tb/integration/tb_bus_access_faults.sv
 tb/integration/tb_ahb_lite_interface.sv
+tb/integration/tb_wfi_sleep.sv
 tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv

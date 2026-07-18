@@ -9,6 +9,7 @@ module tb_native_to_ahb_lite;
     logic [31:0] haddr, hwdata, hrdata;
     logic [1:0] htrans;
     logic hwrite, hready, hresp, hmastlock;
+    logic busy;
     logic [2:0] hsize, hburst;
     logic [3:0] hprot;
 
@@ -18,6 +19,7 @@ module tb_native_to_ahb_lite;
         .i_native_addr(native_addr), .i_native_wdata(native_wdata),
         .i_native_size(native_size), .o_native_rdata(native_rdata),
         .o_native_ready(native_ready), .o_native_error(native_error),
+        .o_busy(busy),
         .o_haddr(haddr), .o_htrans(htrans), .o_hwrite(hwrite),
         .o_hsize(hsize), .o_hburst(hburst), .o_hprot(hprot),
         .o_hmastlock(hmastlock), .o_hwdata(hwdata),

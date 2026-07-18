@@ -35,6 +35,7 @@ module tb_ahb_lite_interface;
         .i_irq_software(1'b0),
         .i_irq_timer(1'b0),
         .i_irq_external(1'b0),
+        .o_core_sleep(),
         .o_iahb_haddr(iahb_haddr),
         .o_iahb_htrans(iahb_htrans),
         .o_iahb_hwrite(iahb_hwrite),

@@ -16,6 +16,8 @@ module rv32i_top #(
     input  logic i_irq_timer,
     input  logic i_irq_external,
 
+    output logic o_core_sleep,
+
     // Instruction AHB-Lite master
     output logic [N-1:0] o_iahb_haddr,
     output logic [1:0]   o_iahb_htrans,
@@ -60,6 +62,9 @@ module rv32i_top #(
     logic [N-1:0] dmem_addr, dmem_wdata, dmem_rdata;
     logic [3:0]   dmem_wstrb;
     logic [1:0]   dmem_size;
+    logic         core_sleep, iahb_busy, dahb_busy;
+
+    assign o_core_sleep = core_sleep && !iahb_busy && !dahb_busy;
 
     rv32i_core #(
         .N(N),
@@ -76,6 +81,7 @@ module rv32i_top #(
         .i_irq_software(i_irq_software),
         .i_irq_timer(i_irq_timer),
         .i_irq_external(i_irq_external),
+        .o_core_sleep(core_sleep),
         .o_imem_valid(imem_valid),
         .o_imem_addr(imem_addr),
         .i_imem_rdata(imem_rdata),
@@ -117,6 +123,7 @@ module rv32i_top #(
         .i_native_addr(imem_addr), .i_native_wdata('0), .i_native_size(2'd2),
         .o_native_rdata(imem_rdata), .o_native_ready(imem_ready),
         .o_native_error(imem_error),
+        .o_busy(iahb_busy),
         .o_haddr(o_iahb_haddr), .o_htrans(o_iahb_htrans),
         .o_hwrite(o_iahb_hwrite), .o_hsize(o_iahb_hsize),
         .o_hburst(o_iahb_hburst), .o_hprot(o_iahb_hprot),
@@ -135,6 +142,7 @@ module rv32i_top #(
         .i_native_size(dmem_size),
         .o_native_rdata(dmem_rdata), .o_native_ready(dmem_ready),
         .o_native_error(dmem_error),
+        .o_busy(dahb_busy),
         .o_haddr(o_dahb_haddr), .o_htrans(o_dahb_htrans),
         .o_hwrite(o_dahb_hwrite), .o_hsize(o_dahb_hsize),
         .o_hburst(o_dahb_hburst), .o_hprot(o_dahb_hprot),

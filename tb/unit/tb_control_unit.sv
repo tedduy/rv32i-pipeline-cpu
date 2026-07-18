@@ -24,6 +24,7 @@ module tb_control_unit;
   logic        Ecall;
   logic        Ebreak;
   logic        Mret;
+  logic        Wfi;
   logic        Illegal;
 
   // Instantiate DUT
@@ -49,6 +50,7 @@ module tb_control_unit;
     .o_Ecall(Ecall),
     .o_Ebreak(Ebreak),
     .o_Mret(Mret),
+    .o_Wfi(Wfi),
     .o_Illegal(Illegal)
   );
 
@@ -196,6 +198,16 @@ module tb_control_unit;
       pass_count++;
     end else begin
       $display("[FAIL] MRET decode");
+    end
+
+    instruction = 32'h1050_0073; // wfi
+    #1;
+    test_count++;
+    if (Wfi && !Mret && !Ecall && !Ebreak && !Illegal && !RegWrite) begin
+      $display("[PASS] WFI");
+      pass_count++;
+    end else begin
+      $display("[FAIL] WFI decode");
     end
 
     instruction = 32'hffff_ffff;

@@ -25,6 +25,7 @@ module tb_load_use_hazard;
         .i_irq_software(1'b0),
         .i_irq_timer   (1'b0),
         .i_irq_external(1'b0),
+        .o_core_sleep  (),
         .o_imem_addr   (imem_addr),
         .i_imem_rdata  (imem_rdata),
         .o_imem_valid  (imem_valid),
@@ -97,6 +98,7 @@ module tb_load_use_hazard;
         arst_n = 1'b0;
         stall_cycles = 0;
         repeat (3) @(posedge clk);
+        @(negedge clk);
         arst_n = 1'b1;
 
         repeat (20) @(posedge clk);

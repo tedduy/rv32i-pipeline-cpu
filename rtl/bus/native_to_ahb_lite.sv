@@ -16,6 +16,7 @@ module native_to_ahb_lite #(
     output logic [N-1:0] o_native_rdata,
     output logic         o_native_ready,
     output logic         o_native_error,
+    output logic         o_busy,
 
     output logic [N-1:0] o_haddr,
     output logic [1:0]   o_htrans,
@@ -39,6 +40,7 @@ module native_to_ahb_lite #(
     assign o_hburst    = 3'b000; // SINGLE
     assign o_hprot     = HPROT_VALUE;
     assign o_hmastlock = 1'b0;
+    assign o_busy       = (state == DATA_PHASE);
 
     always_comb begin
         o_haddr   = request_addr;

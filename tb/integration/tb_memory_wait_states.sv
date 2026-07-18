@@ -31,6 +31,7 @@ module tb_memory_wait_states;
         .i_irq_software(1'b0),
         .i_irq_timer   (1'b0),
         .i_irq_external(1'b0),
+        .o_core_sleep  (),
         .o_imem_valid  (imem_valid),
         .o_imem_addr   (imem_addr),
         .i_imem_rdata  (imem_rdata),
@@ -208,6 +209,7 @@ module tb_memory_wait_states;
     initial begin
         arst_n = 1'b0;
         repeat (3) @(posedge clk);
+        @(negedge clk);
         arst_n = 1'b1;
 
         repeat (100) @(posedge clk);

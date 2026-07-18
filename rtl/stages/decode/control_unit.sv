@@ -32,6 +32,7 @@ module control_unit (
   output logic        o_Ecall,
   output logic        o_Ebreak,
   output logic        o_Mret,
+  output logic        o_Wfi,
   output logic        o_Illegal
 );
 
@@ -144,7 +145,8 @@ module control_unit (
           if (f3 == 3'b000)
             instruction_is_legal = (inst == 32'h0000_0073) ||
                                    (inst == 32'h0010_0073) ||
-                                   (inst == 32'h3020_0073);
+                                   (inst == 32'h3020_0073) ||
+                                   (inst == 32'h1050_0073);
           else
             instruction_is_legal = (f3 == 3'b001) || (f3 == 3'b010) ||
                                    (f3 == 3'b011) || (f3 == 3'b101) ||
@@ -182,6 +184,7 @@ module control_unit (
     o_Ecall      = 1'b0;
     o_Ebreak     = 1'b0;
     o_Mret       = 1'b0;
+    o_Wfi        = 1'b0;
 
     case (opcode)
       // ======================================================================
@@ -345,6 +348,7 @@ module control_unit (
               32'h0000_0073: o_Ecall  = 1'b1;
               32'h0010_0073: o_Ebreak = 1'b1;
               32'h3020_0073: o_Mret   = 1'b1;
+              32'h1050_0073: o_Wfi    = 1'b1;
               default: begin end
             endcase
           end

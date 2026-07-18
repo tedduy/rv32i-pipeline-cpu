@@ -30,6 +30,7 @@ module csr_file #(
     output logic [N-1:0]     o_mtvec,
     output logic [N-1:0]     o_mepc,
     output logic             o_irq_pending,
+    output logic             o_wake_pending,
     output logic [N-1:0]     o_irq_cause
 );
 
@@ -83,6 +84,9 @@ module csr_file #(
         mip[11] = i_irq_external;
 
         o_irq_pending = 1'b0;
+        o_wake_pending = (mie[11] && i_irq_external) ||
+                         (mie[3]  && i_irq_software) ||
+                         (mie[7]  && i_irq_timer);
         o_irq_cause   = '0;
         if (mstatus_mie && mie[11] && i_irq_external) begin
             o_irq_pending = 1'b1;
