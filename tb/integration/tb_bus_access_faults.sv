@@ -15,7 +15,7 @@ module tb_bus_access_faults;
     logic [31:0] commit_pc;
     integer      trap_count;
 
-    rv32i_top dut (
+    rv32i_core dut (
         .i_clk               (clk),
         .i_arst_n            (arst_n),
         .i_irq_software      (1'b0),
@@ -32,6 +32,7 @@ module tb_bus_access_faults;
         .o_dmem_addr         (dmem_addr),
         .o_dmem_wdata        (dmem_wdata),
         .o_dmem_wstrb        (dmem_wstrb),
+        .o_dmem_size         (),
         .i_dmem_rdata        (32'hdead_beef),
         .i_dmem_ready        (1'b1),
         .i_dmem_error        (dmem_error),

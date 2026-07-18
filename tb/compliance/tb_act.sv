@@ -48,7 +48,7 @@ module tb_act;
     integer      i;
     logic [31:0] dmem_word_addr;
 
-    rv32i_top #(
+    rv32i_core #(
         .RESET_VECTOR(32'h0000_0000)
     ) dut (
         .i_clk                 (clk),
@@ -67,6 +67,7 @@ module tb_act;
         .o_dmem_addr           (dmem_addr),
         .o_dmem_wdata          (dmem_wdata),
         .o_dmem_wstrb          (dmem_wstrb),
+        .o_dmem_size           (),
         .i_dmem_rdata          (dmem_rdata),
         .i_dmem_ready          (1'b1),
         .i_dmem_error          (1'b0),

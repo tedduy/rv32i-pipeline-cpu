@@ -6,6 +6,7 @@
 +incdir+rtl/stages/system
 +incdir+rtl/pipeline
 +incdir+rtl/hazard
++incdir+rtl/bus
 +incdir+tb/unit
 +incdir+tb/integration
 +incdir+tb/compliance
@@ -39,7 +40,9 @@ rtl/pipeline/mem_wb_register.sv
 rtl/hazard/forwarding_unit.sv
 rtl/hazard/hazard_detection_unit.sv
 
+rtl/bus/native_to_ahb_lite.sv
 rtl/rv32i_top.sv
+rtl/rv32i_ahb_lite_top.sv
 
 tb/integration/tb_full_verification.sv
 tb/integration/tb_rv32i_pipeline.sv
@@ -52,6 +55,7 @@ tb/integration/tb_machine_external_interrupt.sv
 tb/integration/tb_machine_exceptions.sv
 tb/integration/tb_machine_identification_csrs.sv
 tb/integration/tb_bus_access_faults.sv
+tb/integration/tb_ahb_lite_interface.sv
 tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv
@@ -64,3 +68,4 @@ tb/unit/tb_control_unit.sv
 tb/unit/tb_program_counter.sv
 tb/unit/tb_instruction_memory.sv
 tb/unit/tb_data_memory.sv
+tb/unit/tb_native_to_ahb_lite.sv

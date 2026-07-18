@@ -25,7 +25,7 @@ module tb_memory_wait_states;
     logic [3:0]  held_dmem_wstrb;
     logic        held_dmem_read, held_dmem_write;
 
-    rv32i_top dut (
+    rv32i_core dut (
         .i_clk         (clk),
         .i_arst_n      (arst_n),
         .i_irq_software(1'b0),
@@ -42,6 +42,7 @@ module tb_memory_wait_states;
         .o_dmem_addr   (dmem_addr),
         .o_dmem_wdata  (dmem_wdata),
         .o_dmem_wstrb  (dmem_wstrb),
+        .o_dmem_size   (),
         .i_dmem_rdata  (dmem_rdata),
         .i_dmem_ready  (dmem_ready),
         .i_dmem_error  (1'b0),

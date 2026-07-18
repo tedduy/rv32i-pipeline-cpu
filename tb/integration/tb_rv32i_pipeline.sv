@@ -38,7 +38,7 @@ module tb_rv32i_pipeline #(
     // DUT Instantiation
     //==========================================================================
     
-    rv32i_top #(.N(N)) dut (
+    rv32i_core #(.N(N)) dut (
         .i_clk       (clk),
         .i_arst_n    (~rst),
         .i_irq_software(1'b0),
@@ -55,6 +55,7 @@ module tb_rv32i_pipeline #(
         .o_dmem_addr (dmem_addr),
         .o_dmem_wdata(dmem_wdata),
         .o_dmem_wstrb(dmem_wstrb),
+        .o_dmem_size(),
         .i_dmem_rdata(dmem_rdata),
         .i_dmem_ready(dmem_ready),
         .i_dmem_error(1'b0),

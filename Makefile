@@ -80,12 +80,14 @@ PIPELINE_WAVE = wave_tb_rv32i_pipeline.do
 UNIT_TESTS = tb_alu_unit tb_register_file tb_immediate_generator tb_branch_unit \
              tb_jump_unit tb_load_store_unit tb_control_unit tb_program_counter \
              tb_instruction_memory tb_data_memory
+UNIT_TESTS += tb_native_to_ahb_lite
 
 INTEGRATION_TESTS = tb_rv32i_pipeline tb_full_verification tb_load_use_hazard \
                     tb_memory_wait_states tb_reset_vector tb_commit_interface \
                     tb_machine_csr_trap tb_machine_external_interrupt \
                     tb_machine_exceptions tb_machine_identification_csrs
 INTEGRATION_TESTS += tb_bus_access_faults
+INTEGRATION_TESTS += tb_ahb_lite_interface
 
 VCS_REGRESSION_TESTS = $(UNIT_TESTS) $(INTEGRATION_TESTS)
 
@@ -147,6 +149,7 @@ help:
 	@echo "  tb_alu_unit, tb_register_file, tb_immediate_generator, tb_branch_unit"
 	@echo "  tb_jump_unit, tb_load_store_unit, tb_control_unit, tb_program_counter"
 	@echo "  tb_instruction_memory, tb_data_memory"
+	@echo "  tb_native_to_ahb_lite"
 	@echo ""
 	@echo "Integration Tests:"
 	@echo "  tb_rv32i_pipeline, tb_full_verification, tb_load_use_hazard"
@@ -156,6 +159,7 @@ help:
 	@echo "  tb_machine_exceptions"
 	@echo "  tb_machine_identification_csrs"
 	@echo "  tb_bus_access_faults"
+	@echo "  tb_ahb_lite_interface"
 	@echo ""
 	@echo "Gate-Level:"
 	@echo "  Run 3 (Best Config) - 0.81mm², 50MHz, 0 DRC violations"

@@ -16,7 +16,7 @@ module tb_reset_vector;
     logic [31:0] dmem_addr, dmem_wdata;
     logic [3:0]  dmem_wstrb;
 
-    rv32i_top #(
+    rv32i_core #(
         .RESET_VECTOR(RESET_VECTOR)
     ) dut (
         .i_clk          (clk),
@@ -35,6 +35,7 @@ module tb_reset_vector;
         .o_dmem_addr    (dmem_addr),
         .o_dmem_wdata   (dmem_wdata),
         .o_dmem_wstrb   (dmem_wstrb),
+        .o_dmem_size    (),
         .i_dmem_rdata   (32'b0),
         .i_dmem_ready   (1'b1),
         .i_dmem_error   (1'b0),

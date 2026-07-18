@@ -10,7 +10,7 @@ module tb_machine_exceptions;
     logic [31:0] commit_pc;
     integer      trap_count;
 
-    rv32i_top dut (
+    rv32i_core dut (
         .i_clk               (clk),
         .i_arst_n            (arst_n),
         .i_irq_software      (1'b0),
@@ -27,6 +27,7 @@ module tb_machine_exceptions;
         .o_dmem_addr         (),
         .o_dmem_wdata        (),
         .o_dmem_wstrb        (),
+        .o_dmem_size         (),
         .i_dmem_rdata        (32'b0),
         .i_dmem_ready        (1'b1),
         .i_dmem_error        (1'b0),

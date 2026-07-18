@@ -4,7 +4,7 @@
 // UPDATED: Fixed synchronization for W_jal, W_jalr, W_branch_taken to WB stage
 // =============================================================================
 
-module rv32i_top #(
+module rv32i_core #(
     parameter N = 32,
     parameter REG_DEPTH = 32,
     parameter logic [N-1:0] RESET_VECTOR = '0,
@@ -37,6 +37,7 @@ module rv32i_top #(
     output logic [N-1:0] o_dmem_addr,
     output logic [N-1:0] o_dmem_wdata,
     output logic [3:0]   o_dmem_wstrb,
+    output logic [1:0]   o_dmem_size,
     input  logic [N-1:0] i_dmem_rdata,
     input  logic         i_dmem_ready,
     // Error qualifies an accepted response (valid && ready).
@@ -299,6 +300,9 @@ module rv32i_top #(
     assign o_dmem_addr    = mem_alu_result;
     assign o_dmem_wdata   = mem_store_data;
     assign o_dmem_wstrb   = mem_byte_enable;
+    assign o_dmem_size    = (mem_mem_type == 3'b010) ? 2'd2 :
+                            ((mem_mem_type == 3'b001) ||
+                             (mem_mem_type == 3'b101)) ? 2'd1 : 2'd0;
     assign dmem_wait      = o_dmem_valid && !i_dmem_ready;
     assign memory_stall   = imem_wait || dmem_wait;
     assign W_stall        = stall_if_id || memory_stall;
