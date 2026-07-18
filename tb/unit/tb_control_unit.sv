@@ -76,7 +76,8 @@ module tb_control_unit;
     if (RegWrite === exp_RegWrite && MemRead === exp_MemRead && MemWrite === exp_MemWrite &&
         ImmSel === exp_ImmSel && WBSel === exp_WBSel && PCSel === exp_PCSel &&
         ALUSrc === exp_ALUSrc && ALUASel === exp_ALUASel && ALUCtrl === exp_ALUCtrl &&
-        BranchEn === exp_BranchEn && JAL === exp_JAL && JALR === exp_JALR) begin
+        BranchEn === exp_BranchEn && JAL === exp_JAL && JALR === exp_JALR &&
+        !Illegal) begin
       $display("[PASS] %s", test_name);
       pass_count++;
     end else begin
@@ -109,6 +110,30 @@ module tb_control_unit;
     // OR x1, x2, x3
     instruction = {7'b0000000, 5'd3, 5'd2, 3'b110, 5'd1, 7'b0110011};
     check_signals(1'b1, 1'b0, 1'b0, 3'b000, 2'b00, 2'b00, 1'b0, 1'b0, 4'b0011, 1'b0, 1'b0, 1'b0, "OR");
+
+    // Zmmul instructions use funct7=0000001 and funct3=000..011.
+    instruction = {7'b0000001, 5'd3, 5'd2, 3'b000, 5'd1, 7'b0110011};
+    check_signals(1'b1, 1'b0, 1'b0, 3'b000, 2'b00, 2'b00, 1'b0, 1'b0, 4'b1010, 1'b0, 1'b0, 1'b0, "MUL");
+
+    instruction = {7'b0000001, 5'd3, 5'd2, 3'b001, 5'd1, 7'b0110011};
+    check_signals(1'b1, 1'b0, 1'b0, 3'b000, 2'b00, 2'b00, 1'b0, 1'b0, 4'b1011, 1'b0, 1'b0, 1'b0, "MULH");
+
+    instruction = {7'b0000001, 5'd3, 5'd2, 3'b010, 5'd1, 7'b0110011};
+    check_signals(1'b1, 1'b0, 1'b0, 3'b000, 2'b00, 2'b00, 1'b0, 1'b0, 4'b1100, 1'b0, 1'b0, 1'b0, "MULHSU");
+
+    instruction = {7'b0000001, 5'd3, 5'd2, 3'b011, 5'd1, 7'b0110011};
+    check_signals(1'b1, 1'b0, 1'b0, 3'b000, 2'b00, 2'b00, 1'b0, 1'b0, 4'b1101, 1'b0, 1'b0, 1'b0, "MULHU");
+
+    // Zmmul does not include DIV or the other funct3=100..111 M operations.
+    instruction = {7'b0000001, 5'd3, 5'd2, 3'b100, 5'd1, 7'b0110011};
+    #1;
+    test_count++;
+    if (Illegal) begin
+      $display("[PASS] DIV remains illegal without full M extension");
+      pass_count++;
+    end else begin
+      $display("[FAIL] DIV decoded as legal under Zmmul");
+    end
 
     // Task 2: Test I-type ALU instructions
     $display("\n--- Task 2: I-type ALU Instructions ---");

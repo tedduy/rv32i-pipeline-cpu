@@ -77,7 +77,11 @@ module control_unit (
     ALU_SLTU = 4'b0110,  // SLTU, SLTIU
     ALU_SLL  = 4'b0111,  // SLL, SLLI
     ALU_SRL  = 4'b1000,  // SRL, SRLI
-    ALU_SRA  = 4'b1001;  // SRA, SRAI
+    ALU_SRA  = 4'b1001,  // SRA, SRAI
+    ALU_MUL  = 4'b1010,  // MUL
+    ALU_MULH = 4'b1011,  // MULH
+    ALU_MULHSU = 4'b1100, // MULHSU
+    ALU_MULHU = 4'b1101; // MULHU
 
   // Immediate types → ImmGen module
   parameter [2:0]
@@ -133,13 +137,17 @@ module control_unit (
           endcase
         end
         OP_REG: begin
-          case (f3)
-            3'b000, 3'b101: instruction_is_legal = (f7 == 7'b0000000) ||
-                                                    (f7 == 7'b0100000);
-            3'b001, 3'b010, 3'b011, 3'b100, 3'b110, 3'b111:
-              instruction_is_legal = (f7 == 7'b0000000);
-            default: instruction_is_legal = 1'b0;
-          endcase
+          if (f7 == 7'b0000001)
+            instruction_is_legal = (f3 <= 3'b011); // Zmmul
+          else begin
+            case (f3)
+              3'b000, 3'b101: instruction_is_legal = (f7 == 7'b0000000) ||
+                                                      (f7 == 7'b0100000);
+              3'b001, 3'b010, 3'b011, 3'b100, 3'b110, 3'b111:
+                instruction_is_legal = (f7 == 7'b0000000);
+              default: instruction_is_legal = 1'b0;
+            endcase
+          end
         end
         // FENCE.I identifies the instruction through funct3.  Its imm, rs1,
         // and rd fields are reserved and must not make the instruction illegal.
@@ -311,31 +319,39 @@ module control_unit (
         o_RegWrite = 1'b1;
         o_WBSel    = WB_ALU;     // ALU result → register
         // ALUSrc = 0 (use rs2), ALUASel = 0 (use rs1)
-        
-        // Decode specific R-type ALU operation
-        case (funct3)
-          3'b000: begin
-            // ADD vs SUB determined by funct7[5]
-            if (funct7[5])
-              o_ALUCtrl = ALU_SUB;       // SUB
-            else
-              o_ALUCtrl = ALU_ADD;       // ADD
-          end
-          3'b001: o_ALUCtrl = ALU_SLL;   // SLL
-          3'b010: o_ALUCtrl = ALU_SLT;   // SLT
-          3'b011: o_ALUCtrl = ALU_SLTU;  // SLTU
-          3'b100: o_ALUCtrl = ALU_XOR;   // XOR
-          3'b101: begin
-            // SRL vs SRA determined by funct7[5]
-            if (funct7[5])
-              o_ALUCtrl = ALU_SRA;       // SRA
-            else
-              o_ALUCtrl = ALU_SRL;       // SRL
-          end
-          3'b110: o_ALUCtrl = ALU_OR;    // OR
-          3'b111: o_ALUCtrl = ALU_AND;   // AND
-          default: o_ALUCtrl = ALU_ADD;
-        endcase
+
+        if (funct7 == 7'b0000001) begin
+          case (funct3)
+            3'b000: o_ALUCtrl = ALU_MUL;
+            3'b001: o_ALUCtrl = ALU_MULH;
+            3'b010: o_ALUCtrl = ALU_MULHSU;
+            3'b011: o_ALUCtrl = ALU_MULHU;
+            default: o_ALUCtrl = ALU_ADD;
+          endcase
+        end else begin
+          // Decode base integer R-type ALU operation.
+          case (funct3)
+            3'b000: begin
+              if (funct7[5])
+                o_ALUCtrl = ALU_SUB;
+              else
+                o_ALUCtrl = ALU_ADD;
+            end
+            3'b001: o_ALUCtrl = ALU_SLL;
+            3'b010: o_ALUCtrl = ALU_SLT;
+            3'b011: o_ALUCtrl = ALU_SLTU;
+            3'b100: o_ALUCtrl = ALU_XOR;
+            3'b101: begin
+              if (funct7[5])
+                o_ALUCtrl = ALU_SRA;
+              else
+                o_ALUCtrl = ALU_SRL;
+            end
+            3'b110: o_ALUCtrl = ALU_OR;
+            3'b111: o_ALUCtrl = ALU_AND;
+            default: o_ALUCtrl = ALU_ADD;
+          endcase
+        end
       end
 
       OP_MISC_MEM: begin

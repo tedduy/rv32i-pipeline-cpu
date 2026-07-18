@@ -24,7 +24,11 @@ module tb_alu_unit;
     ALU_SLTU = 4'b0110,
     ALU_SLL  = 4'b0111,
     ALU_SRL  = 4'b1000,
-    ALU_SRA  = 4'b1001;
+    ALU_SRA  = 4'b1001,
+    ALU_MUL  = 4'b1010,
+    ALU_MULH = 4'b1011,
+    ALU_MULHSU = 4'b1100,
+    ALU_MULHU = 4'b1101;
 
   // Instantiate DUT
   alu_unit #(.N(N)) dut (
@@ -92,8 +96,22 @@ module tb_alu_unit;
     operand_a = 32'h80000000; operand_b = 32'd4; alu_ctrl = ALU_SRA; #1;
     check_result(32'hF8000000, "SRA: 0x80000000 >> 4 (arithmetic)");
 
-    // Task 5: Test zero flag
-    $display("\n--- Task 5: Zero Flag ---");
+    // Task 5: Test Zmmul operations
+    $display("\n--- Task 5: Zmmul Operations ---");
+    operand_a = -32'sd3; operand_b = 32'd7; alu_ctrl = ALU_MUL; #1;
+    check_result(32'hffff_ffeb, "MUL: low half of -3 * 7");
+
+    operand_a = -32'sd2; operand_b = 32'd3; alu_ctrl = ALU_MULH; #1;
+    check_result(32'hffff_ffff, "MULH: signed high half");
+
+    operand_a = -32'sd2; operand_b = 32'hffff_ffff; alu_ctrl = ALU_MULHSU; #1;
+    check_result(32'hffff_fffe, "MULHSU: signed by unsigned high half");
+
+    operand_a = 32'hffff_ffff; operand_b = 32'hffff_ffff; alu_ctrl = ALU_MULHU; #1;
+    check_result(32'hffff_fffe, "MULHU: unsigned high half");
+
+    // Task 6: Test zero flag
+    $display("\n--- Task 6: Zero Flag ---");
     operand_a = 32'd10; operand_b = 32'd10; alu_ctrl = ALU_SUB; #1;
     if (zero_flag === 1'b1) begin
       $display("[PASS] Zero flag set when result is 0");

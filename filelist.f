@@ -59,6 +59,7 @@ tb/integration/tb_ahb_lite_interface.sv
 tb/integration/tb_wfi_sleep.sv
 tb/integration/tb_fence_i.sv
 tb/integration/tb_zicntr.sv
+tb/integration/tb_zmmul.sv
 tb/compliance/tb_act.sv
 
 tb/unit/tb_alu_unit.sv
