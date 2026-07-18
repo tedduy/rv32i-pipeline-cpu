@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one ELF or a directory of ACT4 self-checking ELFs with VCS."""
+"""Run one ELF or a directory of self-checking RISC-V ELFs with VCS."""
 
 from __future__ import annotations
 
@@ -25,11 +25,12 @@ def discover(path: Path) -> list[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", type=Path, help="ACT4 ELF or directory containing ELFs")
+    parser.add_argument("input", type=Path, help="ELF or directory containing ELFs")
     parser.add_argument("--simv", type=Path, required=True, help="compiled tb_act VCS executable")
     parser.add_argument("--work-dir", type=Path, default=Path("build/act4"))
     parser.add_argument("--max-cycles", type=int, default=1_000_000)
     parser.add_argument("--memory-bytes", type=int, default=1024 * 1024)
+    parser.add_argument("--suite-name", default="ACT4 regression")
     args = parser.parse_args()
 
     tests = discover(args.input)
@@ -74,7 +75,7 @@ def main() -> int:
             log_file.write_text(f"{error}\n", encoding="utf-8")
             print(f"  ERROR: {error}")
 
-    print(f"\nACT4 regression: {passed}/{len(tests)} passed")
+    print(f"\n{args.suite_name}: {passed}/{len(tests)} passed")
     if failed:
         print("Failed tests:")
         for elf in failed:

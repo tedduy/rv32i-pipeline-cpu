@@ -22,9 +22,9 @@ def load_segments(path: Path, memory_bytes: int) -> list[tuple[int, bytes]]:
     if len(image) < ELF_HEADER_SIZE or image[:4] != b"\x7fELF":
         raise ElfError(f"{path}: not an ELF file")
     if image[4] != 1:
-        raise ElfError(f"{path}: ACT runner requires ELF32")
+        raise ElfError(f"{path}: runner requires ELF32")
     if image[5] != 1:
-        raise ElfError(f"{path}: ACT runner requires a little-endian ELF")
+        raise ElfError(f"{path}: runner requires a little-endian ELF")
     machine = struct.unpack_from("<H", image, 18)[0]
     if machine != 243:
         raise ElfError(f"{path}: ELF machine {machine} is not RISC-V")

@@ -17,6 +17,10 @@ identification/configuration CSR. `mhartid` cùng các ID có thể cấu hình 
 tham số top-level. Ba ngõ vào interrupt đồng bộ với clock hỗ trợ machine
 software, timer và external interrupt.
 
+ISA hiện tại là RV32I cùng `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`. Zmmul cung
+cấp `MUL`, `MULH`, `MULHSU` và `MULHU`; các phép chia của full M extension chưa
+được triển khai.
+
 Illegal instruction, truy cập CSR không được hỗ trợ, địa chỉ load/store lệch
 alignment và target branch/jump lệch `IALIGN=32` đều tạo precise exception trước
 khi instruction gây lỗi tạo side effect.
@@ -149,8 +153,9 @@ Hai file list được dùng là:
 ## Architectural compliance (ACT4)
 
 Thư mục [`compliance/act4/`](compliance/act4/) chứa cấu hình cho flow ACT4 chính
-thức. Profile hiện tại kiểm tra `I` và `Zicsr`; machine-mode `Sm` được khai báo
-làm architectural context nhưng bộ test privileged đầy đủ chưa được bật.
+thức. Profile hiện tại kiểm tra `I`, `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`;
+machine-mode `Sm` cung cấp architectural context và bộ ExceptionsSm có target
+riêng.
 
 Môi trường local nằm trong `.tools/act4/` và không được đưa vào Git. Nó không
 sửa `PATH`, `.bashrc` hay package hệ thống. Kiểm tra installation bằng:
@@ -177,6 +182,28 @@ một installation khác.
 `tb/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
 `0x1000_0000` và thanh ghi pass/fail tại `0x2000_0000`. Script Python đọc trực
 tiếp các segment ELF32 little-endian nên bước chạy DUT không phụ thuộc `objcopy`.
+
+## Bare-metal C firmware
+
+`software/smoke/` chứa startup assembly, linker script và chương trình C
+freestanding được link tại reset vector `0x0000_0000`. Firmware khởi tạo stack,
+xóa `.bss`, cài `mtvec`, kiểm tra bốn lệnh Zmmul, đọc `cycle`/`instret`, thực thi
+`FENCE.I` và in kết quả qua UART mô phỏng tại `0x1000_0000`.
+
+Flow dùng GCC nằm trong `.tools/act4/toolchain/`, không sửa `PATH` hoặc cài
+toolchain vào hệ thống:
+
+```bash
+# Tạo ELF, map và disassembly trong build/firmware/smoke/
+make firmware-build
+
+# Compile ELF harness bằng VCS rồi chạy firmware
+make firmware-run
+```
+
+Firmware báo pass bằng cách ghi giá trị `1` tới thanh ghi trạng thái mô phỏng
+tại `0x2000_0000`. Exception hoặc interrupt ngoài dự kiến đi vào `trap_entry`
+và báo fail.
 
 ## FPGA
 

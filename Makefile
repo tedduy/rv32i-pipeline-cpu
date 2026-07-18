@@ -4,7 +4,8 @@
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
 	vcs vcs-compile vcs-run vcs-gui vcs-regression verdi act-tools-check act-generate act-compile act-run \
-	act-regression act-zicsr act-zifencei act-zicntr act-zmmul act-sm-prepare act-sm-generate act-sm-exceptions distclean
+	act-regression act-zicsr act-zifencei act-zicntr act-zmmul act-sm-prepare act-sm-generate act-sm-exceptions \
+	firmware-build firmware-run distclean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -48,6 +49,22 @@ ACT_ENV = env \
 	XDG_DATA_HOME="$(ACT_TOOL_ROOT)/xdg-data" \
 	XDG_CACHE_HOME="$(ACT_TOOL_ROOT)/xdg-cache" \
 	XDG_CONFIG_HOME="$(ACT_TOOL_ROOT)/xdg-config"
+
+# Bare-metal firmware smoke test. Reuse the project-local ACT4 cross compiler so
+# this flow does not require a system-wide RISC-V toolchain installation.
+RISCV_TOOLCHAIN_PREFIX ?= $(ACT_TOOL_ROOT)/toolchain/bin/riscv32-none-elf-
+FW_CC = $(RISCV_TOOLCHAIN_PREFIX)gcc
+FW_OBJDUMP = $(RISCV_TOOLCHAIN_PREFIX)objdump
+FW_SIZE = $(RISCV_TOOLCHAIN_PREFIX)size
+FW_DIR = software/smoke
+FW_BUILD_DIR = build/firmware/smoke
+FW_ELF = $(FW_BUILD_DIR)/smoke.elf
+FW_ARCH ?= rv32i_zicsr_zifencei_zmmul
+FW_CFLAGS = -march=$(FW_ARCH) -mabi=ilp32 -mcmodel=medlow -msmall-data-limit=0 \
+	-O2 -g -ffreestanding -fno-builtin -fno-common -ffunction-sections -fdata-sections \
+	-Wall -Wextra -Werror
+FW_LDFLAGS = -nostdlib -nostartfiles -Wl,--gc-sections,--no-relax \
+	-Wl,-Map,$(FW_BUILD_DIR)/smoke.map -T $(FW_DIR)/linker.ld
 
 # Compile flags
 VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
@@ -109,7 +126,7 @@ help:
 	@echo "  make rtl-compile      - Compile RTL and testbenches"
 	@echo "  make run TB=<name>    - Run specific testbench"
 	@echo "  make wave TB=<name>   - Open an RTL testbench in the waveform viewer"
-	@echo "  make unit             - Run all unit tests (10 tests)"
+	@echo "  make unit             - Run all unit tests ($(words $(UNIT_TESTS)) tests)"
 	@echo "  make pipeline         - Run pipeline integration test"
 	@echo "  make verify           - Run write-back verification"
 	@echo "  make all              - Compile + run all tests"
@@ -135,6 +152,10 @@ help:
 	@echo "  make act-sm-generate    - Generate the privileged ExceptionsSm ELF"
 	@echo "  make act-sm-exceptions  - Run the generated ExceptionsSm ELF"
 	@echo ""
+	@echo "Bare-metal Firmware Commands:"
+	@echo "  make firmware-build    - Build the freestanding C smoke-test ELF"
+	@echo "  make firmware-run      - Build and run the C firmware with VCS"
+	@echo ""
 	@echo "Gate-Level Simulation Commands:"
 	@echo "  make gl-compile       - Compile Sky130 netlist and GL testbench"
 	@echo "  make gl               - Run gate-level simulation"
@@ -147,7 +168,7 @@ help:
 	@echo "  make run TB=tb_alu_unit           - Test ALU only"
 	@echo "  make wave TB=tb_alu_unit          - View ALU waveform"
 	@echo "  make run TB=tb_rv32i_pipeline     - Test pipeline"
-	@echo "  make unit                         - Test all 10 units"
+	@echo "  make unit                         - Test all $(words $(UNIT_TESTS)) units"
 	@echo "  make gl                           - Run gate-level sim"
 	@echo "  make vcs TB=tb_rv32i_pipeline    - Compile and run with VCS"
 	@echo "  make verdi TB=tb_rv32i_pipeline  - Open the VCS design in Verdi"
@@ -349,6 +370,33 @@ act-sm-generate: act-sm-prepare
 
 act-sm-exceptions: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/priv/ExceptionsSm
 act-sm-exceptions: act-regression
+
+# Build a real freestanding C program linked at the reset vector. The resulting
+# ELF uses the same 1 MiB unified RAM and simulation UART/status addresses as
+# the compliance harness.
+firmware-build:
+	@test -x "$(FW_CC)" || { \
+		echo "Missing RISC-V compiler: $(FW_CC)"; \
+		echo "Run 'make act-tools-check' or override RISCV_TOOLCHAIN_PREFIX."; \
+		exit 1; \
+	}
+	@mkdir -p "$(FW_BUILD_DIR)"
+	@echo "=========================================="
+	@echo "Building bare-metal firmware: $(FW_ELF)"
+	@echo "ISA: $(FW_ARCH), ABI: ilp32"
+	@echo "=========================================="
+	@$(FW_CC) $(FW_CFLAGS) $(FW_LDFLAGS) \
+		$(FW_DIR)/start.S $(FW_DIR)/main.c -o "$(FW_ELF)"
+	@$(FW_OBJDUMP) -d -S "$(FW_ELF)" > "$(FW_BUILD_DIR)/smoke.dump"
+	@$(FW_SIZE) "$(FW_ELF)"
+
+# The general ELF harness is shared with ACT4. A firmware pass requires the C
+# program to write status value 1 to 0x2000_0000.
+firmware-run: firmware-build act-compile
+	@python3 scripts/run_act.py "$(FW_ELF)" \
+		--simv "$(VCS_BUILD_ROOT)/tb_act/simv" \
+		--work-dir "$(FW_BUILD_DIR)" --max-cycles 100000 \
+		--suite-name "Firmware smoke test"
 
 # Compile the generated Sky130 netlist independently from RTL.
 gl-compile:
