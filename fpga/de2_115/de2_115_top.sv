@@ -58,7 +58,7 @@ module de2_115_top (
             sw17_sync1 <= 1'b0;
             sw17_sync2 <= 1'b0;
         end else begin
-            sw17_sync1 <= SW[15];
+            sw17_sync1 <= SW[17];
             sw17_sync2 <= sw17_sync1;
         end
     end
@@ -70,26 +70,41 @@ module de2_115_top (
     // CPU DEBUG INTERFACE
     // ==========================================================================
     
-    logic [31:0] W_PC_out;
-    logic [31:0] W_instruction;
-    logic [31:0] W_RD1, W_RD2;
-    logic [4:0]  W_rd_addr;
-    logic        W_reg_write;
-    logic [31:0] W_m1, W_m2;
-    logic [31:0] W_ALUout;
-    logic [31:0] W_mem_addr;
-    logic [31:0] W_mem_wdata;
-    logic [31:0] W_mem_rdata;
-    logic        W_mem_write;
-    logic        W_mem_read;
-    logic [31:0] W_WB_data;
-    logic        W_branch_taken;
-    logic        W_jal;
-    logic        W_jalr;
-    logic        W_stall;
-    logic        W_flush;
-    logic [31:0] W_immediate;
-    logic        W_ALUSrc;
+    logic [31:0] debug_pc;
+    logic [31:0] debug_instruction;
+    logic [31:0] debug_rs1_data, debug_rs2_data;
+    logic [4:0]  debug_rd_addr;
+    logic        debug_rd_write;
+    logic [31:0] debug_alu_operand_b, debug_branch_target;
+    logic [31:0] debug_alu_result;
+    logic [31:0] debug_mem_addr;
+    logic [31:0] debug_mem_wdata;
+    logic [31:0] debug_mem_rdata;
+    logic        debug_mem_write;
+    logic        debug_mem_read;
+    logic [31:0] debug_wb_data;
+    logic        debug_branch_taken;
+    logic        debug_jal;
+    logic        debug_jalr;
+    logic        debug_stall;
+    logic        debug_flush;
+    logic [31:0] debug_immediate;
+    logic        debug_alu_uses_immediate;
+
+    // Native instruction/data memory interfaces used by rv32i_core.
+    logic        imem_valid;
+    logic [31:0] imem_addr;
+    logic [31:0] imem_rdata;
+    logic        dmem_valid;
+    logic        dmem_read;
+    logic        dmem_write;
+    logic [31:0] dmem_addr;
+    logic [31:0] dmem_wdata;
+    logic [31:0] dmem_rdata;
+    logic [3:0]  dmem_wstrb;
+    logic [1:0]  dmem_size;
+
+    logic [31:0] cycle_counter;
     
     // Decode ALUSrc from instruction opcode
     logic        alu_uses_imm;
@@ -98,39 +113,99 @@ module de2_115_top (
     // CPU INSTANTIATION
     // ==========================================================================
     
-    rv32i_top cpu (
+    rv32i_core u_core (
         .i_clk         (clk),
         .i_arst_n      (rst_n),
+
+        .i_irq_software(1'b0),
+        .i_irq_timer   (1'b0),
+        .i_irq_external(1'b0),
+        .i_time        ({32'b0, cycle_counter}),
+        .o_core_sleep  (),
+        .o_fence_i     (),
+
+        .o_imem_valid  (imem_valid),
+        .o_imem_addr   (imem_addr),
+        .i_imem_rdata  (imem_rdata),
+        .i_imem_ready  (1'b1),
+        .i_imem_error  (1'b0),
+
+        .o_dmem_valid  (dmem_valid),
+        .o_dmem_read   (dmem_read),
+        .o_dmem_write  (dmem_write),
+        .o_dmem_addr   (dmem_addr),
+        .o_dmem_wdata  (dmem_wdata),
+        .o_dmem_wstrb  (dmem_wstrb),
+        .o_dmem_size   (dmem_size),
+        .i_dmem_rdata  (dmem_rdata),
+        .i_dmem_ready  (1'b1),
+        .i_dmem_error  (1'b0),
+
+        .o_commit_valid(),
+        .o_commit_pc   (),
+        .o_commit_instruction(),
+        .o_commit_rd_write(),
+        .o_commit_rd_addr(),
+        .o_commit_rd_data(),
+        .o_commit_mem_write(),
+        .o_commit_mem_addr(),
+        .o_commit_mem_wdata(),
+        .o_commit_mem_wstrb(),
         
-        .W_PC_out      (W_PC_out),
-        .instruction   (W_instruction),
-        .W_RD1         (W_RD1),
-        .W_RD2         (W_RD2),
-        .W_m1          (W_m1),
-        .W_m2          (W_m2),
-        .W_ALUout      (W_ALUout),
-        .W_WB_data     (W_WB_data),
-        .W_rd_addr     (W_rd_addr),
-        .W_reg_write   (W_reg_write),
-        .W_mem_write   (W_mem_write),
-        .W_mem_read    (W_mem_read),
-        .W_branch_taken(W_branch_taken),
-        .W_mem_addr    (W_mem_addr),
-        .W_mem_wdata   (W_mem_wdata),
-        .W_mem_rdata   (W_mem_rdata),
-        .W_jal         (W_jal),
-        .W_jalr        (W_jalr),
-        .W_stall       (W_stall),
-        .W_flush       (W_flush),
-        .W_immediate   (W_immediate),
-        .W_ALUSrc      (W_ALUSrc)
+        .o_debug_pc      (debug_pc),
+        .o_debug_instruction   (debug_instruction),
+        .o_debug_rs1_data         (debug_rs1_data),
+        .o_debug_rs2_data         (debug_rs2_data),
+        .o_debug_alu_operand_b          (debug_alu_operand_b),
+        .o_debug_branch_target          (debug_branch_target),
+        .o_debug_alu_result      (debug_alu_result),
+        .o_debug_wb_data     (debug_wb_data),
+        .o_debug_rd_addr     (debug_rd_addr),
+        .o_debug_rd_write   (debug_rd_write),
+        .o_debug_mem_write   (debug_mem_write),
+        .o_debug_mem_read    (debug_mem_read),
+        .o_debug_branch_taken(debug_branch_taken),
+        .o_debug_mem_addr    (debug_mem_addr),
+        .o_debug_mem_wdata   (debug_mem_wdata),
+        .o_debug_mem_rdata   (debug_mem_rdata),
+        .o_debug_jal         (debug_jal),
+        .o_debug_jalr        (debug_jalr),
+        .o_debug_stall       (debug_stall),
+        .o_debug_flush       (debug_flush),
+        .o_debug_immediate   (debug_immediate),
+        .o_debug_alu_uses_immediate      (debug_alu_uses_immediate)
+    );
+
+    // Small on-chip memories keep the board wrapper self-contained. Both
+    // native ports are zero-wait-state, matching the original FPGA demo.
+    instruction_memory #(
+        .N(32),
+        .DEPTH(77)
+    ) u_imem (
+        .i_clk   (clk),
+        .i_arst_n(rst_n),
+        .i_addr  (imem_addr),
+        .o_instruction(imem_rdata)
+    );
+
+    data_memory #(
+        .N(32),
+        .BYTES(256)
+    ) u_dmem (
+        .i_clk   (clk),
+        .i_arst_n(rst_n),
+        .i_we    (dmem_valid && dmem_write),
+        .i_re    (dmem_valid && dmem_read),
+        .i_addr  (dmem_addr),
+        .i_wdata (dmem_wdata),
+        .i_wstrb (dmem_wstrb),
+        .o_rdata (dmem_rdata)
     );
     
     // ==========================================================================
     // PERFORMANCE COUNTERS
     // ==========================================================================
     
-    logic [31:0] cycle_counter;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             cycle_counter <= 32'h0;
@@ -142,7 +217,7 @@ module de2_115_top (
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             instruction_counter <= 32'h0;
-        else if (W_reg_write && (W_rd_addr != 5'h0))
+        else if (debug_rd_write && (debug_rd_addr != 5'h0))
             instruction_counter <= instruction_counter + 32'h1;
     end
     
@@ -165,9 +240,9 @@ module de2_115_top (
     debug_mode_t debug_mode;
     assign debug_mode = debug_mode_t'(SW[2:0]);
     
-    // Decode if instruction uses immediate (synchronized with W_instruction at WB stage)
+    // Decode if instruction uses immediate (synchronized with debug_instruction at WB stage)
     logic [6:0] opcode;
-    assign opcode = W_instruction[6:0];
+    assign opcode = debug_instruction[6:0];
     
     always_comb begin
         case (opcode)
@@ -186,15 +261,15 @@ module de2_115_top (
     
     always_comb begin
         case (debug_mode)
-            MODE_PC:          display_value = W_PC_out;
-            MODE_INSTRUCTION: display_value = W_instruction;
-            MODE_ALU_OUT:     display_value = W_ALUout;
-            MODE_WB_DATA:     display_value = W_WB_data;
-            MODE_RD1:         display_value = W_RD1;
-            MODE_ALU_SRC:     display_value = alu_uses_imm ? W_immediate : W_RD2;  // Show actual ALU operand B
-            MODE_MEM_ADDR:    display_value = W_mem_addr;
+            MODE_PC:          display_value = debug_pc;
+            MODE_INSTRUCTION: display_value = debug_instruction;
+            MODE_ALU_OUT:     display_value = debug_alu_result;
+            MODE_WB_DATA:     display_value = debug_wb_data;
+            MODE_RD1:         display_value = debug_rs1_data;
+            MODE_ALU_SRC:     display_value = alu_uses_imm ? debug_immediate : debug_rs2_data;  // Show actual ALU operand B
+            MODE_MEM_ADDR:    display_value = debug_mem_addr;
             MODE_CYCLE_CNT:   display_value = cycle_counter;
-            default:          display_value = W_PC_out;
+            default:          display_value = debug_pc;
         endcase
     end
     
@@ -217,14 +292,14 @@ module de2_115_top (
             LEDG <= 9'h0;
         end else begin
             LEDG[0] <= rst_n;           // CPU running
-            LEDG[1] <= W_reg_write;     // Register write
-            LEDG[2] <= W_mem_write;     // Memory write
-            LEDG[3] <= W_mem_read;      // Memory read
-            LEDG[4] <= W_branch_taken;  // Branch taken
-            LEDG[5] <= W_jal;           // JAL instruction
-            LEDG[6] <= W_jalr;          // JALR instruction
-            LEDG[7] <= W_stall;         // Pipeline stall
-            LEDG[8] <= W_flush;         // Pipeline flush
+            LEDG[1] <= debug_rd_write;     // Register write
+            LEDG[2] <= debug_mem_write;     // Memory write
+            LEDG[3] <= debug_mem_read;      // Memory read
+            LEDG[4] <= debug_branch_taken;  // Branch taken
+            LEDG[5] <= debug_jal;           // JAL instruction
+            LEDG[6] <= debug_jalr;          // JALR instruction
+            LEDG[7] <= debug_stall;         // Pipeline stall
+            LEDG[8] <= debug_flush;         // Pipeline flush
         end
     end
     

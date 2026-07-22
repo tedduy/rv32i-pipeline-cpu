@@ -26,7 +26,7 @@ WORK_DIR = work
 WORK_GL_DIR = work_gl
 LOG_DIR = logs
 VCS_BUILD_ROOT = build/vcs
-ACT_CONFIG = compliance/act4/test_config.yaml
+ACT_CONFIG = rtl/sim/compliance/act4/test_config.yaml
 ACT_WORK_DIR = build/act4
 ACT_MAX_CYCLES ?= 1000000
 ACT_EXTENSIONS ?= I,Zicsr,Zifencei,Zicntr,Zmmul
@@ -34,8 +34,8 @@ ACT_EXCLUDE_EXTENSIONS ?=
 ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
 ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs
-ACT_SM_PATCHES = compliance/act4/patches/0001-split-exceptions-sm.patch \
-	compliance/act4/patches/0002-fix-ialign32-trap-resume.patch
+ACT_SM_PATCHES = rtl/sim/compliance/act4/patches/0001-split-exceptions-sm.patch \
+	rtl/sim/compliance/act4/patches/0002-fix-ialign32-trap-resume.patch
 ACT_ENV = env \
 	PATH="$(ACT_TOOL_ROOT)/bin:$(ACT_TOOL_ROOT)/toolchain/bin:$(ACT_TOOL_ROOT)/sail/bin:$$PATH" \
 	MISE_DATA_DIR="$(ACT_TOOL_ROOT)/mise-data" \
@@ -56,7 +56,7 @@ RISCV_TOOLCHAIN_PREFIX ?= $(ACT_TOOL_ROOT)/toolchain/bin/riscv32-none-elf-
 FW_CC = $(RISCV_TOOLCHAIN_PREFIX)gcc
 FW_OBJDUMP = $(RISCV_TOOLCHAIN_PREFIX)objdump
 FW_SIZE = $(RISCV_TOOLCHAIN_PREFIX)size
-FW_DIR = software/smoke
+FW_DIR = rtl/sim/firmware/smoke
 FW_BUILD_DIR = build/firmware/smoke
 FW_ELF = $(FW_BUILD_DIR)/smoke.elf
 FW_ARCH ?= rv32i_zicsr_zifencei_zmmul
@@ -75,7 +75,7 @@ SKY130_PDK_ROOT ?= $(CURDIR)/.tools/pdk-sky130
 SKY130_DB_DIR ?= $(SKY130_PDK_ROOT)/synopsys_skywater_flow_nominal/sky130_db
 SYNTH_LIBRARY ?= $(SKY130_DB_DIR)/sky130_fd_sc_hd__tt_025C_1v80.db
 SYNTH_OUTPUT_DIR ?= $(CURDIR)/build/synth/dc/$(SYNTH_TOP)
-SYNTH_SCRIPT = synth/dc/run.tcl
+SYNTH_SCRIPT = rtl/syn/dc/run.tcl
 
 # Compile flags
 VLOG_FLAGS = -sv +acc -work $(WORK_DIR)
@@ -95,14 +95,14 @@ VCS_FLAGS += -debug_access+all -kdb
 VCS_FLAGS += -Mdir=$(VCS_BUILD_DIR)/csrc
 
 # File lists
-RTL_FILELIST = filelist.f
-GL_FILELIST = filelist_netlist.f
+RTL_FILELIST = rtl/sim/filelist.f
+GL_FILELIST = rtl/sim/filelist_netlist.f
 
 # Sky130 PDK used only by gate-level simulation
 PDK_ROOT ?=
 SKY130_PRIMITIVES = $(PDK_ROOT)/sky130B/libs.ref/sky130_fd_sc_hd/verilog/primitives.v
 SKY130_LIB = $(PDK_ROOT)/sky130B/libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v
-PIPELINE_WAVE = wave_tb_rv32i_pipeline.do
+PIPELINE_WAVE = rtl/sim/waves/wave_tb_rv32i_pipeline.do
 
 # Unit test list
 UNIT_TESTS = tb_alu_unit tb_multicycle_multiplier tb_register_file tb_immediate_generator tb_branch_unit \
@@ -470,7 +470,9 @@ run: rtl-compile
 	@echo "=========================================="
 	@echo "Running: $(TB)"
 	@echo "=========================================="
-	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).$(TB) -do "run -all; quit -f" | tee $(LOG_DIR)/$(TB).log
+	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).$(TB) -do "run -all; quit -f" \
+		> $(LOG_DIR)/$(TB).log 2>&1; status=$$?; \
+		cat $(LOG_DIR)/$(TB).log; exit $$status
 	@echo ""
 	@echo "✓ Simulation complete!"
 	@echo "✓ Log saved: $(LOG_DIR)/$(TB).log"
@@ -501,10 +503,10 @@ wave-gl: gl-compile
 unit: rtl-compile
 	@mkdir -p $(LOG_DIR)
 	@echo "=========================================="
-	@echo "Running All Unit Tests (10 tests)"
+	@echo "Running All Unit Tests ($(words $(UNIT_TESTS)) tests)"
 	@echo "=========================================="
 ##	@echo "" > $(LOG_DIR)/unit_tests_summary.log
-	@passed=0; total=0; \
+	@passed=0; failed=0; total=0; \
 	for test in $(UNIT_TESTS); do \
 		echo ""; \
 		echo "--- Running: $$test ---"; \
@@ -517,6 +519,7 @@ unit: rtl-compile
 		else \
 			echo "✗ FAILED (see log for details)"; \
 			echo "$$test: FAILED" >> $(LOG_DIR)/unit_tests_summary.log; \
+			failed=$$((failed + 1)); \
 		fi; \
 		total=$$((total + 1)); \
 	done; \
@@ -524,7 +527,8 @@ unit: rtl-compile
 	echo "=========================================="; \
 	echo "✓ Unit tests complete: $$passed/$$total PASSED"; \
 	echo "✓ Logs saved in: $(LOG_DIR)/"; \
-	echo "=========================================="
+	echo "=========================================="; \
+	test $$failed -eq 0
 
 # Run pipeline integration test (clean output)
 pipeline: rtl-compile
@@ -540,6 +544,7 @@ pipeline: rtl-compile
 		grep "CPI (Cycles Per Instruction):" $(LOG_DIR)/tb_rv32i_pipeline.log | sed 's/#//g' | xargs echo "  "; \
 	else \
 		echo "✗ Pipeline test FAILED or status unknown"; \
+		exit 1; \
 	fi
 	@echo "✓ Log saved: $(LOG_DIR)/tb_rv32i_pipeline.log"
 	@echo "=========================================="
@@ -553,74 +558,26 @@ verify: rtl-compile
 	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).tb_full_verification -do "run -all; quit -f" > $(LOG_DIR)/tb_full_verification.log 2>&1
 	@echo ""
 	@if grep -q "Verification Summary" $(LOG_DIR)/tb_full_verification.log; then \
-		echo "✓ Verification test PASSED"; \
 		grep "Total Instructions Executed:" $(LOG_DIR)/tb_full_verification.log | sed 's/#//g' | xargs echo "  "; \
 		grep "Instructions Checked:" $(LOG_DIR)/tb_full_verification.log | sed 's/#//g' | xargs echo "  "; \
 		errors=$$(grep "Errors:" $(LOG_DIR)/tb_full_verification.log | tail -1 | sed 's/.*Errors: \([0-9]*\).*/\1/'); \
 		if [ "$$errors" = "0" ]; then \
+			echo "✓ Verification test PASSED"; \
 			echo "  ✓ No errors found"; \
 		else \
 			echo "  ✗ $$errors errors found"; \
+			exit 1; \
 		fi; \
 	else \
 		echo "✗ Verification test FAILED or status unknown"; \
+		exit 1; \
 	fi
 	@echo "✓ Log saved: $(LOG_DIR)/tb_full_verification.log"
 	@echo "=========================================="
 
-# Compile and run all tests
-all: rtl-compile
-	@mkdir -p $(LOG_DIR)
-	@echo "=========================================="
-	@echo "Running All Tests"
-	@echo "=========================================="
-	@echo ""
-	@echo "=== Unit Tests (10 tests) ==="
-	@echo "" > $(LOG_DIR)/unit_tests_summary.log
-	@passed=0; total=0; \
-	for test in $(UNIT_TESTS); do \
-		echo "Running: $$test..."; \
-		$(SIM) $(VSIM_FLAGS) $(WORK_DIR).$$test -do "run -all; quit -f" > $(LOG_DIR)/$$test.log 2>&1; \
-		if grep -q "ALL TESTS PASSED" $(LOG_DIR)/$$test.log; then \
-			count=$$(grep "Passed:" $(LOG_DIR)/$$test.log | tail -1 | sed 's/.*Passed: \([0-9]*\).*/\1/'); \
-			echo "  ✓ $$test: PASSED ($$count tests)"; \
-			echo "$$test: PASSED ($$count tests)" >> $(LOG_DIR)/unit_tests_summary.log; \
-			passed=$$((passed + 1)); \
-		else \
-			echo "  ✗ $$test: FAILED"; \
-			echo "$$test: FAILED" >> $(LOG_DIR)/unit_tests_summary.log; \
-		fi; \
-		total=$$((total + 1)); \
-	done; \
-	echo "Unit tests: $$passed/$$total PASSED"; \
-	echo ""
-	@echo "=== Pipeline Integration Test ==="
-	@echo "Running: tb_rv32i_pipeline..."
-	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).tb_rv32i_pipeline -do "run -all; quit -f" > $(LOG_DIR)/tb_rv32i_pipeline.log 2>&1
-	@if grep -q "Test Status: PASSED" $(LOG_DIR)/tb_rv32i_pipeline.log; then \
-		echo "  ✓ Pipeline test: PASSED"; \
-	else \
-		echo "  ✗ Pipeline test: FAILED"; \
-	fi
-	@echo ""
-	@echo "=== Full Verification Test ==="
-	@echo "Running: tb_full_verification..."
-	@$(SIM) $(VSIM_FLAGS) $(WORK_DIR).tb_full_verification -do "run -all; quit -f" > $(LOG_DIR)/tb_full_verification.log 2>&1
-	@if grep -q "Verification Summary" $(LOG_DIR)/tb_full_verification.log; then \
-		errors=$$(grep "Errors:" $(LOG_DIR)/tb_full_verification.log | tail -1 | sed 's/.*Errors: \([0-9]*\).*/\1/'); \
-		if [ "$$errors" = "0" ]; then \
-			echo "  ✓ Verification test: PASSED (0 errors)"; \
-		else \
-			echo "  ✗ Verification test: FAILED ($$errors errors)"; \
-		fi; \
-	else \
-		echo "  ✗ Verification test: FAILED"; \
-	fi
-	@echo ""
-	@echo "=========================================="
-	@echo "✓ All tests complete!"
-	@echo "✓ All logs saved in: $(LOG_DIR)/"
-	@echo "=========================================="
+# Compile once, then run the maintained Questa unit and integration targets.
+# Each prerequisite propagates a nonzero status on failure.
+all: unit pipeline verify
 
 # ==============================================================================
 # Gate-Level Simulation Targets

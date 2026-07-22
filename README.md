@@ -44,50 +44,50 @@ tín hiệu debug nội bộ.
 
 Đọc theo thứ tự sau để hiểu thiết kế nhanh nhất:
 
-1. [`rtl/rv32i_top.sv`](rtl/rv32i_top.sv) — kết nối toàn bộ datapath và control path.
-2. [`rtl/pipeline/`](rtl/pipeline/) — bốn ranh giới của pipeline.
-3. [`rtl/stages/decode/control_unit.sv`](rtl/stages/decode/control_unit.sv) — giải mã instruction.
-4. [`rtl/stages/execute/alu_unit.sv`](rtl/stages/execute/alu_unit.sv) — datapath thực thi.
-5. [`rtl/hazard/`](rtl/hazard/) — stall, flush và forwarding.
-6. [`tb/integration/tb_rv32i_pipeline.sv`](tb/integration/tb_rv32i_pipeline.sv) — luồng kiểm thử toàn CPU.
+1. [`rtl/logical/rv32i_core.sv`](rtl/logical/rv32i_core.sv) — native-bus core `rv32i_core`, kết nối toàn bộ datapath và control path.
+2. [`rtl/logical/pipeline/`](rtl/logical/pipeline/) — bốn ranh giới của pipeline.
+3. [`rtl/logical/stages/decode/control_unit.sv`](rtl/logical/stages/decode/control_unit.sv) — giải mã instruction.
+4. [`rtl/logical/stages/execute/alu_unit.sv`](rtl/logical/stages/execute/alu_unit.sv) — datapath thực thi.
+5. [`rtl/logical/hazard/`](rtl/logical/hazard/) — stall, flush và forwarding.
+6. [`rtl/sim/integration/tb_rv32i_pipeline.sv`](rtl/sim/integration/tb_rv32i_pipeline.sv) — luồng kiểm thử toàn CPU.
 
 ## Cấu trúc repo
 
 ```text
 rv32i-pipeline-cpu/
 ├── rtl/
-│   ├── rv32i_top.sv
-│   ├── stages/
-│   │   ├── fetch/            # IF: PC và model instruction memory bên ngoài core
-│   │   ├── decode/           # ID: control, immediate, register file
-│   │   ├── execute/          # EX: ALU, branch và jump
-│   │   ├── memory/           # MEM: load/store và model data memory bên ngoài core
-│   │   └── system/           # Machine-mode CSR và trap state
-│   ├── pipeline/             # IF/ID, ID/EX, EX/MEM, MEM/WB
-│   ├── hazard/               # Forwarding và hazard detection
-│   └── common/               # Adder và mux dùng chung
-├── tb/
-│   ├── unit/
-│   ├── integration/
-│   └── gate_level/
+│   ├── logical/              # Technology-independent synthesizable RTL
+│   │   ├── rv32i_core.sv
+│   │   ├── rv32i_top.sv
+│   │   ├── stages/           # Fetch, decode, execute, memory, system
+│   │   ├── pipeline/         # IF/ID, ID/EX, EX/MEM, MEM/WB
+│   │   ├── hazard/           # Forwarding và hazard detection
+│   │   ├── bus/              # Native-to-AHB-Lite bridge
+│   │   └── common/           # Adder và mux dùng chung
+│   ├── sim/                  # Unit, integration, ACT4 và gate-level TB
+│   ├── syn/                  # Synthesis flows
+│   ├── sdc/                  # Timing constraints
+│   ├── lint/                 # Lint rules và waivers
+│   ├── cdc/                  # Clock-domain crossing collateral
+│   ├── rdc/                  # Reset-domain crossing collateral
+│   └── doc/                  # RTL và verification documents
 ├── fpga/
 │   └── de2_115/
 ├── asic/
 │   └── sky130/netlist/
-├── docs/
-├── filelist.f
-├── filelist_netlist.f
-├── wave_tb_rv32i_pipeline.do
+├── scripts/
 └── Makefile
 ```
 
 ## Quy ước đặt tên
 
+- Quy ước đầy đủ nằm tại [`rtl/doc/coding_style.md`](rtl/doc/coding_style.md).
 - Một module SystemVerilog chính trên mỗi file.
 - Tên file trùng tên module và dùng `lower_snake_case`.
 - Testbench dùng tiền tố `tb_`.
 - Tín hiệu stage dùng tiền tố `if_`, `id_`, `ex_`, `mem_`, `wb_`.
-- `rv32i_top` được giữ ổn định làm entry point cho RTL, FPGA và ASIC.
+- `rv32i_core` là native-bus core; `rv32i_top` là public AHB-Lite wrapper.
+- FPGA wrapper có thể dùng trực tiếp `rv32i_core` với memory subsystem của board.
 
 ## Chạy simulation
 
@@ -149,12 +149,12 @@ make gl PDK_ROOT=/path/to/sky130/pdk
 
 Hai file list được dùng là:
 
-- [`filelist.f`](filelist.f) — RTL và testbench.
-- [`filelist_netlist.f`](filelist_netlist.f) — Sky130 netlist và gate-level testbench.
+- [`rtl/sim/filelist.f`](rtl/sim/filelist.f) — RTL và testbench.
+- [`rtl/sim/filelist_netlist.f`](rtl/sim/filelist_netlist.f) — Sky130 netlist và gate-level testbench.
 
 ## Architectural compliance (ACT4)
 
-Thư mục [`compliance/act4/`](compliance/act4/) chứa cấu hình cho flow ACT4 chính
+Thư mục [`rtl/sim/compliance/act4/`](rtl/sim/compliance/act4/) chứa cấu hình cho flow ACT4 chính
 thức. Profile hiện tại kiểm tra `I`, `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`;
 machine-mode `Sm` cung cấp architectural context và bộ ExceptionsSm có target
 riêng.
@@ -181,13 +181,13 @@ make act-zicsr
 Có thể override `ACT_ROOT`, `ACT_TOOL_ROOT` hoặc `ACT_ELF_DIR` nếu muốn dùng
 một installation khác.
 
-`tb/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
+`rtl/sim/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
 `0x1000_0000` và thanh ghi pass/fail tại `0x2000_0000`. Script Python đọc trực
 tiếp các segment ELF32 little-endian nên bước chạy DUT không phụ thuộc `objcopy`.
 
 ## Bare-metal C firmware
 
-`software/smoke/` chứa startup assembly, linker script và chương trình C
+`rtl/sim/firmware/smoke/` chứa startup assembly, linker script và chương trình C
 freestanding được link tại reset vector `0x0000_0000`. Firmware khởi tạo stack,
 xóa `.bss`, cài `mtvec`, kiểm tra bốn lệnh Zmmul, đọc `cycle`/`instret`, thực thi
 `FENCE.I` và in kết quả qua UART mô phỏng tại `0x1000_0000`.
@@ -209,7 +209,7 @@ và báo fail.
 
 ## Synthesis với Design Compiler
 
-Flow tại [`synth/dc/run.tcl`](synth/dc/run.tcl) tổng hợp trực tiếp RTL hiện tại,
+Flow tại [`rtl/syn/dc/run.tcl`](rtl/syn/dc/run.tcl) tổng hợp trực tiếp RTL hiện tại,
 tạo netlist và các báo cáo area, timing, QoR trong `build/synth/dc/`. Mặc định
 flow tổng hợp native core `rv32i_core` với clock 10 ns (100 MHz):
 
@@ -251,7 +251,7 @@ Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
 
 ## Tài liệu kết quả
 
-- [`docs/verification_report.md`](docs/verification_report.md)
-- [`docs/performance_analysis.md`](docs/performance_analysis.md)
+- [`rtl/doc/verification_report.md`](rtl/doc/verification_report.md)
+- [`rtl/doc/performance_analysis.md`](rtl/doc/performance_analysis.md)
 
 Các báo cáo trên ghi lại kết quả của phiên bản trước refactor. Cần chạy lại simulation trên máy có QuestaSim trước khi phát hành tag mới.
