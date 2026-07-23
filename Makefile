@@ -25,6 +25,8 @@ help:
 	@echo "  make random-regression   Constrained-random test seeds"
 	@echo "  make coverage            Gate code metrics + 100% functional bins"
 	@echo "  make formal              SymbiYosys protocol proofs"
+	@echo "  make riscv-formal        Bounded RV32IMC ISA + consistency checks"
+	@echo "  make riscv-formal-all    Run every generated RV32IMC instruction check"
 	@echo "  make synth-yosys         Yosys synthesis sanity check"
 	@echo
 	@echo "RISC-V compliance"
@@ -43,7 +45,7 @@ help:
 
 test: cocotb-verilator cocotb-iverilog
 
-ci: lint test random-regression coverage synth-yosys formal
+ci: lint test random-regression coverage synth-yosys formal riscv-formal
 all: ci
 
 clean:

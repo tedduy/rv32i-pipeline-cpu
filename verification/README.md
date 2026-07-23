@@ -8,6 +8,8 @@ responsibility:
 - Yosys checks that the production RTL remains synthesizable.
 - ACT4 checks architectural RISC-V compliance.
 - SymbiYosys proves bounded interface and retirement invariants.
+- YosysHQ riscv-formal checks RVFI instruction semantics, illegal traps,
+  register consistency and forward/backward PC consistency.
 
 The cocotb environment drives only the public native memory and interrupt
 interfaces and checks architectural results through the commit interface.
@@ -41,8 +43,10 @@ field.
 
 The formal protocol harness proves bounded interface and retirement safety for
 arbitrary instruction/data responses and reaches both retirement and data-bus
-cover goals. Full ISA equivalence with `riscv-formal` remains a separate step:
-the current commit interface does not yet expose all required RVFI fields.
+cover goals. The separate RVFI shadow path is compiled only with
+`RISCV_FORMAL`; the default bounded gate samples RV32I/RV32C semantics and
+checks illegal traps, register state and PC continuity. The extended target
+generates every RV32IMC instruction job, with deeper bounds for iterative M.
 
 ## Commands
 
@@ -55,6 +59,7 @@ make cocotb-iverilog
 make random-regression
 make synth-yosys
 make formal
+make riscv-formal
 make coverage
 make ci
 ```

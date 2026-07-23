@@ -72,4 +72,8 @@ jobs:
             build/cocotb/
             build/synth/yosys/
             verification/formal/rv32i_core_protocol_*/
+            .tools/riscv-formal/cores/rv32i-pipeline/checks/*/status
+            .tools/riscv-formal/cores/rv32i-pipeline/checks/*/logfile.txt
+            .tools/riscv-formal/cores/rv32i-pipeline/checks/*/engine_0/trace.vcd
           if-no-files-found: ignore
+          include-hidden-files: true

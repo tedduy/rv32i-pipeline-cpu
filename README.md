@@ -44,6 +44,10 @@ Bubble, instruction bị flush và chu kỳ đang chờ memory không tạo comm
 này phù hợp để làm scoreboard, trace hoặc lockstep checker mà không phải đọc các
 tín hiệu debug nội bộ.
 
+Khi compile với `RISCV_FORMAL`, core còn xuất một kênh RVFI in-order đầy đủ cho
+instruction retire/trap, register, PC và memory access. Shadow path này không
+tồn tại trong production synthesis.
+
 ## Bắt đầu đọc từ đâu?
 
 Đọc theo thứ tự sau để hiểu thiết kế nhanh nhất:
@@ -78,7 +82,8 @@ rv32i-pipeline-cpu/
 │   └── doc/                  # RTL và verification documents
 ├── verification/
 │   ├── cocotb/               # Testbench kiến trúc và unit coverage
-│   └── formal/               # SymbiYosys properties
+│   ├── formal/               # SymbiYosys protocol properties
+│   └── riscv-formal/         # RVFI wrapper và ISA checks
 ├── mk/                       # Các flow được Makefile nạp
 ├── fpga/
 │   └── de2_115/
@@ -130,6 +135,7 @@ Các lệnh thường dùng:
 make test       # Cocotb trên cả Verilator và Icarus
 make lint       # Dùng setup và ghi report trong rtl/lint/
 make coverage   # Code-coverage ratchet + functional bins 100%
+make riscv-formal # RVFI ISA/trap/register/PC checks
 make ci         # Lint + test + random + coverage + synthesis + formal
 make clean      # Xóa toàn bộ artifact trong build/
 ```
