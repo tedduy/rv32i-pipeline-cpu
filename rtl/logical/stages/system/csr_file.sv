@@ -229,7 +229,12 @@ module csr_file #(
                     end
                     CSR_MIE:       mie               <= i_csr_wdata &
                                                           {{(N-12){1'b0}}, 12'h888};
-                    CSR_MTVEC:     mtvec             <= {i_csr_wdata[N-1:2], 2'b00};
+                    // Support direct (0) and vectored (1). Reserved MODE
+                    // values are WARL-coerced to direct while preserving BASE.
+                    CSR_MTVEC:     mtvec             <= {
+                        i_csr_wdata[N-1:2],
+                        (i_csr_wdata[1:0] == 2'b01) ? 2'b01 : 2'b00
+                    };
                     CSR_MCOUNTINHIBIT: mcountinhibit <= i_csr_wdata &
                                                           {{(N-3){1'b0}}, 3'b101};
                     CSR_MSCRATCH:  mscratch          <= i_csr_wdata;

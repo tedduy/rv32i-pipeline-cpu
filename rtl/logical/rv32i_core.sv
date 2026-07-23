@@ -172,6 +172,7 @@ module rv32i_core #(
     logic [N-1:0] csr_irq_cause, trap_cause, trap_value;
     logic [N-1:0] trap_pc;
     logic [N-1:0] system_redirect_pc;
+    logic [N-1:0] trap_vector_base, trap_vector_offset, trap_vector_pc;
     logic [N-1:0] control_transfer_target;
     logic         instruction_addr_misaligned;
     logic         data_addr_misaligned;
@@ -841,7 +842,12 @@ module rv32i_core #(
     assign fence_i_taken = ex_valid && ex_fence_i && !data_access_exception &&
                            !ex_sync_trap && !irq_take && !memory_stall;
     assign system_redirect = trap_enter || mret_taken || wfi_sleep || fence_i_taken;
-    assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00} :
+    assign trap_vector_base = {csr_mtvec[N-1:2], 2'b00};
+    assign trap_vector_offset = {trap_cause[N-3:0], 2'b00};
+    assign trap_vector_pc = trap_vector_base +
+                            ((irq_take && (csr_mtvec[1:0] == 2'b01))
+                             ? trap_vector_offset : '0);
+    assign system_redirect_pc = trap_enter ? trap_vector_pc :
                                 mret_taken ? {csr_mepc[N-1:1], 1'b0} :
                                 ex_pc + (ex_compressed
                                        ? {{(N-2){1'b0}}, 2'd2}
