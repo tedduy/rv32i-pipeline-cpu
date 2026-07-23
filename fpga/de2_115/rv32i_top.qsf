@@ -61,9 +61,11 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/common/mux3to1.
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/common/mux4to1.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/fetch/program_counter.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/fetch/instruction_memory.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/fetch/rv32c_fetch_buffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/decode/control_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/decode/immediate_generator.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/decode/register_file.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/decode/rv32c_decompressor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/alu_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/iterative_multiplier.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/branch_unit.sv

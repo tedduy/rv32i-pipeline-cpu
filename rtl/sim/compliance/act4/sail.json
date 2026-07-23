@@ -446,9 +446,7 @@
       "supported": false
     },
     "Zca": {
-      // This core implements only 32-bit instructions. Keeping Zca disabled
-      // makes IALIGN=32, so mepc[1:0] are read-only zero in the reference model.
-      "supported": false
+      "supported": true
     },
     "Zcf": {
       "supported": false

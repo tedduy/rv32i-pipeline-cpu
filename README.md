@@ -1,4 +1,4 @@
-# RV32I 5-Stage Pipeline CPU
+# RV32IC 5-Stage Pipeline CPU
 
 CPU RISC-V 32-bit triển khai bằng SystemVerilog, sử dụng pipeline 5 tầng:
 
@@ -17,22 +17,27 @@ identification/configuration CSR. `mhartid` cùng các ID có thể cấu hình 
 tham số top-level. Ba ngõ vào interrupt đồng bộ với clock hỗ trợ machine
 software, timer và external interrupt.
 
-ISA hiện tại là RV32I cùng `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`. Zmmul cung
+ISA hiện tại là RV32IC cùng `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`. Phần
+`Zca` của compressed extension được giải nén ở fetch stage; PC tiến thêm 2 hoặc
+4 byte và fetch buffer ghép được lệnh 32-bit bắt đầu tại nửa trên của một word.
+Zmmul cung
 cấp `MUL`, `MULH`, `MULHSU` và `MULHU` qua multiplier iterative radix-2. Phần
 cứng dùng một bước shift-add mỗi chu kỳ và hoàn tất sau 32 chu kỳ, ưu tiên area
 nhỏ cho MCU hơn throughput MUL. Pipeline giữ instruction ở EX cho tới khi kết
 quả sẵn sàng. Các phép chia của full M extension chưa được triển khai.
 
-Illegal instruction, truy cập CSR không được hỗ trợ, địa chỉ load/store lệch
-alignment và target branch/jump lệch `IALIGN=32` đều tạo precise exception trước
-khi instruction gây lỗi tạo side effect.
+Illegal instruction, truy cập CSR không được hỗ trợ và địa chỉ load/store lệch
+alignment đều tạo precise exception trước khi instruction gây lỗi tạo side
+effect. Core dùng `IALIGN=16`; `mepc[1]` được giữ lại và target control-flow chỉ
+cần căn hàng theo 2 byte.
 
 ## Commit/retire interface
 
 Khi một instruction hoàn tất theo đúng thứ tự chương trình, core phát một xung
 `o_commit_valid` kèm theo:
 
-- `o_commit_pc`, `o_commit_instruction`: PC và mã lệnh đã retire.
+- `o_commit_pc`, `o_commit_instruction`: PC và encoding gốc của lệnh đã retire;
+  lệnh compressed được zero-extend từ 16 lên 32 bit.
 - `o_commit_rd_write`, `o_commit_rd_addr`, `o_commit_rd_data`: thay đổi register kiến trúc.
 - `o_commit_mem_write`, `o_commit_mem_addr`, `o_commit_mem_wdata`, `o_commit_mem_wstrb`: side effect của store.
 
@@ -46,7 +51,8 @@ tín hiệu debug nội bộ.
 
 1. [`rtl/logical/rv32i_core.sv`](rtl/logical/rv32i_core.sv) — native-bus core `rv32i_core`, kết nối toàn bộ datapath và control path.
 2. [`rtl/logical/pipeline/`](rtl/logical/pipeline/) — bốn ranh giới của pipeline.
-3. [`rtl/logical/stages/decode/control_unit.sv`](rtl/logical/stages/decode/control_unit.sv) — giải mã instruction.
+3. [`rtl/logical/stages/fetch/rv32c_fetch_buffer.sv`](rtl/logical/stages/fetch/rv32c_fetch_buffer.sv) và
+   [`rtl/logical/stages/decode/rv32c_decompressor.sv`](rtl/logical/stages/decode/rv32c_decompressor.sv) — fetch và giải nén RV32C.
 4. [`rtl/logical/stages/execute/alu_unit.sv`](rtl/logical/stages/execute/alu_unit.sv) — datapath thực thi.
 5. [`rtl/logical/hazard/`](rtl/logical/hazard/) — stall, flush và forwarding.
 6. [`rtl/sim/integration/tb_rv32i_pipeline.sv`](rtl/sim/integration/tb_rv32i_pipeline.sv) — luồng kiểm thử toàn CPU.
@@ -100,7 +106,7 @@ Yêu cầu:
 # Compile RTL và toàn bộ RTL testbench
 make rtl-compile
 
-# Chạy 10 unit testbench
+# Chạy toàn bộ unit testbench
 make unit
 
 # Chạy pipeline integration test
@@ -155,9 +161,10 @@ Hai file list được dùng là:
 ## Architectural compliance (ACT4)
 
 Thư mục [`rtl/sim/compliance/act4/`](rtl/sim/compliance/act4/) chứa cấu hình cho flow ACT4 chính
-thức. Profile hiện tại kiểm tra `I`, `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`;
-machine-mode `Sm` cung cấp architectural context và bộ ExceptionsSm có target
-riêng.
+thức. Profile hiện tại kiểm tra `I`, `Zca`, `Zicsr`, `Zifencei`, `Zicntr` và
+`Zmmul`; machine-mode `Sm` cung cấp architectural context. `ExceptionsSm` được
+điều chỉnh cho `IALIGN=16`, còn `ExceptionsZc` kiểm tra illegal compressed
+encoding và `C.EBREAK`.
 
 Môi trường local nằm trong `.tools/act4/` và không được đưa vào Git. Nó không
 sửa `PATH`, `.bashrc` hay package hệ thống. Kiểm tra installation bằng:
@@ -174,6 +181,13 @@ make act-run ELF=/path/to/test.elf
 # Chạy toàn bộ ELF vừa sinh
 make act-regression
 
+# Chỉ chạy 26 ELF compressed-integer
+make act-zca
+
+# Sinh và chạy compressed exception suite
+make act-zc-exceptions-generate
+make act-zc-exceptions
+
 # Chỉ chạy sáu ELF Zicsr
 make act-zicsr
 ```
@@ -188,7 +202,8 @@ tiếp các segment ELF32 little-endian nên bước chạy DUT không phụ thu
 ## Bare-metal C firmware
 
 `rtl/sim/firmware/smoke/` chứa startup assembly, linker script và chương trình C
-freestanding được link tại reset vector `0x0000_0000`. Firmware khởi tạo stack,
+freestanding được biên dịch cho `rv32ic_zicsr_zifencei_zmmul` và link tại reset
+vector `0x0000_0000`. Firmware khởi tạo stack,
 xóa `.bss`, cài `mtvec`, kiểm tra bốn lệnh Zmmul, đọc `cycle`/`instret`, thực thi
 `FENCE.I` và in kết quả qua UART mô phỏng tại `0x1000_0000`.
 
@@ -254,4 +269,6 @@ Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
 - [`rtl/doc/verification_report.md`](rtl/doc/verification_report.md)
 - [`rtl/doc/performance_analysis.md`](rtl/doc/performance_analysis.md)
 
-Các báo cáo trên ghi lại kết quả của phiên bản trước refactor. Cần chạy lại simulation trên máy có QuestaSim trước khi phát hành tag mới.
+Kết quả xác minh gần nhất cho phần RV32C: RTL regression 30/30, ACT4 86/86 và
+firmware smoke 1/1. Các báo cáo chi tiết trên vẫn ghi lại số liệu area/timing của
+phiên bản trước RV32C và cần được cập nhật sau lần synthesis kế tiếp.

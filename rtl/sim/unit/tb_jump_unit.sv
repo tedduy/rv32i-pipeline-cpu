@@ -11,6 +11,7 @@ module tb_jump_unit;
   logic [N-1:0] immediate;
   logic         jal;
   logic         jalr;
+  logic         compressed;
   logic [N-1:0] jump_target;
   logic [N-1:0] return_addr;
 
@@ -21,6 +22,7 @@ module tb_jump_unit;
     .i_immediate(immediate),
     .i_jal(jal),
     .i_jalr(jalr),
+    .i_compressed(compressed),
     .o_jump_target(jump_target),
     .o_return_addr(return_addr)
   );
@@ -45,6 +47,7 @@ module tb_jump_unit;
   // Main test
   initial begin
     $display("=== Jump Unit Test ===");
+    compressed = 1'b0;
     
     // Task 1: Test JAL (Jump and Link)
     $display("\n--- Task 1: JAL (Jump and Link) ---");
@@ -81,6 +84,19 @@ module tb_jump_unit;
       pass_count++;
     end else begin
       $display("[FAIL] Return address should be 0x00005004, got 0x%h", return_addr);
+    end
+
+    // A compressed jump links to the following halfword.
+    compressed = 1'b1;
+    pc = 32'h0000_5002;
+    immediate = 32'h0000_0010;
+    #1;
+    test_count++;
+    if (return_addr === 32'h0000_5004) begin
+      $display("[PASS] Compressed return address is PC+2");
+      pass_count++;
+    end else begin
+      $display("[FAIL] Compressed return address should be 0x00005004, got 0x%h", return_addr);
     end
 
     // Summary

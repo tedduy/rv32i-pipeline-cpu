@@ -124,8 +124,8 @@ module tb_machine_identification_csrs;
         repeat (3) @(posedge clk);
         #1;
 
-        if (dut.u_id_regfile.regs[1] !== 32'h4000_0100)
-            $fatal(1, "misa=%08h, expected RV32I value 40000100",
+        if (dut.u_id_regfile.regs[1] !== 32'h4000_0104)
+            $fatal(1, "misa=%08h, expected RV32IC value 40000104",
                    dut.u_id_regfile.regs[1]);
         if (dut.u_id_regfile.regs[2] !== 32'b0 ||
             dut.u_id_regfile.regs[3] !== 32'b0 ||

@@ -67,7 +67,7 @@ module csr_file #(
 
     // RV32 (MXL=1) with the base integer extension I (bit 8). Zicsr is not
     // represented in misa because only single-letter extensions appear there.
-    localparam logic [N-1:0] MISA_VALUE = 32'h4000_0100;
+    localparam logic [N-1:0] MISA_VALUE = 32'h4000_0104;
 
     logic             mstatus_mie;
     logic             mstatus_mpie;
@@ -213,7 +213,7 @@ module csr_file #(
             mcountinhibit <= '0;
         end else begin
             if (i_trap_enter) begin
-                mepc         <= {i_trap_pc[N-1:2], 2'b00};
+                mepc         <= {i_trap_pc[N-1:1], 1'b0};
                 mcause       <= i_trap_cause;
                 mtval        <= i_trap_value;
                 mstatus_mpie <= mstatus_mie;
@@ -233,7 +233,7 @@ module csr_file #(
                     CSR_MCOUNTINHIBIT: mcountinhibit <= i_csr_wdata &
                                                           {{(N-3){1'b0}}, 3'b101};
                     CSR_MSCRATCH:  mscratch          <= i_csr_wdata;
-                    CSR_MEPC:      mepc              <= {i_csr_wdata[N-1:2], 2'b00};
+                    CSR_MEPC:      mepc              <= {i_csr_wdata[N-1:1], 1'b0};
                     CSR_MCAUSE:    mcause            <= i_csr_wdata;
                     CSR_MTVAL:     mtval             <= i_csr_wdata;
                     default: begin end

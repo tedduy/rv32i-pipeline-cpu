@@ -18,6 +18,8 @@ module id_ex_register #(
     input  logic             i_access_fault,
     input  logic [N-1:0]     i_pc,
     input  logic [N-1:0]     i_instruction,
+    input  logic [N-1:0]     i_raw_instruction,
+    input  logic             i_compressed,
     input  logic [N-1:0]     i_rs1_data,
     input  logic [N-1:0]     i_rs2_data,
     input  logic [N-1:0]     i_immediate,
@@ -54,6 +56,8 @@ module id_ex_register #(
     output logic             o_access_fault,
     output logic [N-1:0]     o_pc,
     output logic [N-1:0]     o_instruction,
+    output logic [N-1:0]     o_raw_instruction,
+    output logic             o_compressed,
     output logic [N-1:0]     o_rs1_data,
     output logic [N-1:0]     o_rs2_data,
     output logic [N-1:0]     o_immediate,
@@ -93,6 +97,7 @@ module id_ex_register #(
         if (!i_arst_n) begin
             o_valid        <= 1'b0;
             o_access_fault <= 1'b0;
+            o_compressed   <= 1'b0;
             o_reg_write    <= 1'b0;
             o_mem_read     <= 1'b0;
             o_mem_write    <= 1'b0;
@@ -120,6 +125,7 @@ module id_ex_register #(
         end else if (i_flush) begin
             o_valid        <= 1'b0;
             o_access_fault <= 1'b0;
+            o_compressed   <= 1'b0;
             o_reg_write    <= 1'b0;
             o_mem_read     <= 1'b0;
             o_mem_write    <= 1'b0;
@@ -145,6 +151,7 @@ module id_ex_register #(
         end else begin
             o_valid        <= i_valid;
             o_access_fault <= i_access_fault;
+            o_compressed   <= i_compressed;
             o_reg_write    <= i_reg_write;
             o_mem_read     <= i_mem_read;
             o_mem_write    <= i_mem_write;
@@ -178,6 +185,7 @@ module id_ex_register #(
         if (!i_stall) begin
             o_pc          <= i_pc;
             o_instruction <= i_instruction;
+            o_raw_instruction <= i_raw_instruction;
             o_rs1_data    <= i_rs1_data;
             o_rs2_data    <= i_rs2_data;
             o_immediate   <= i_immediate;

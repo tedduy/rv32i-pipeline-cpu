@@ -22,6 +22,9 @@ rtl/logical/stages/fetch/instruction_memory.sv
 rtl/logical/stages/decode/control_unit.sv
 rtl/logical/stages/decode/immediate_generator.sv
 rtl/logical/stages/decode/register_file.sv
+rtl/logical/stages/decode/rv32c_decompressor.sv
+
+rtl/logical/stages/fetch/rv32c_fetch_buffer.sv
 
 rtl/logical/stages/execute/alu_unit.sv
 rtl/logical/stages/execute/iterative_multiplier.sv
@@ -75,3 +78,5 @@ rtl/sim/unit/tb_program_counter.sv
 rtl/sim/unit/tb_instruction_memory.sv
 rtl/sim/unit/tb_data_memory.sv
 rtl/sim/unit/tb_native_to_ahb_lite.sv
+rtl/sim/unit/tb_rv32c_decompressor.sv
+rtl/sim/unit/tb_rv32c_fetch_buffer.sv

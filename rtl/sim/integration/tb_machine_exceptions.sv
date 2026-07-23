@@ -8,6 +8,7 @@ module tb_machine_exceptions;
     logic        dmem_valid;
     logic        commit_valid;
     logic [31:0] commit_pc;
+    logic [31:0] commit_instruction;
     integer      trap_count;
 
     rv32i_core dut (
@@ -36,7 +37,7 @@ module tb_machine_exceptions;
         .i_dmem_error        (1'b0),
         .o_commit_valid      (commit_valid),
         .o_commit_pc         (commit_pc),
-        .o_commit_instruction(),
+        .o_commit_instruction(commit_instruction),
         .o_commit_rd_write   (),
         .o_commit_rd_addr    (),
         .o_commit_rd_data    (),
@@ -78,9 +79,10 @@ module tb_machine_exceptions;
             32'h0000_0014: imem_rdata = 32'h0011_0593; // addi  x11, x2, 1
             32'h0000_0018: imem_rdata = 32'h00a0_2123; // sw    x10, 2(x0)
             32'h0000_001c: imem_rdata = 32'h0010_0613; // addi  x12, x0, 1
-            32'h0000_0020: imem_rdata = 32'h0020_0693; // addi  x13, x0, 2
+            32'h0000_0020: imem_rdata = 32'h02a0_0693; // addi  x13, x0, 0x2a
             32'h0000_0024: imem_rdata = 32'h0006_8067; // jalr  x0, x13, 0
-            32'h0000_0028: imem_rdata = 32'h0010_0713; // addi  x14, x0, 1
+            // Target 0x2a is halfword-aligned. The upper parcel is C.LI x14,1.
+            32'h0000_0028: imem_rdata = 32'h4705_0001;
             32'h0000_002c: imem_rdata = 32'h0000_006f; // jal   x0, 0
 
             // Generic handler records trap state, skips the faulting
@@ -110,9 +112,13 @@ module tb_machine_exceptions;
 
             if (commit_valid && ((commit_pc == 32'h0000_0008) ||
                                  (commit_pc == 32'h0000_0010) ||
-                                 (commit_pc == 32'h0000_0018) ||
-                                 (commit_pc == 32'h0000_0024)))
+                                 (commit_pc == 32'h0000_0018)))
                 $fatal(1, "Faulting instruction at PC %08h retired", commit_pc);
+
+            if (commit_valid && (commit_pc == 32'h0000_002a) &&
+                (commit_instruction !== 32'h0000_4705))
+                $fatal(1, "Compressed commit encoding=%08h, expected 00004705",
+                       commit_instruction);
 
             if (dut.trap_enter) begin
                 unique case (trap_count)
@@ -126,9 +132,6 @@ module tb_machine_exceptions;
                     2: if (dut.ex_pc !== 32'h0000_0018 ||
                            dut.trap_cause !== 32'd6 || dut.trap_value !== 32'd2)
                            $fatal(1, "Bad store-address-misaligned exception");
-                    3: if (dut.ex_pc !== 32'h0000_0024 ||
-                           dut.trap_cause !== 32'd0 || dut.trap_value !== 32'd2)
-                           $fatal(1, "Bad instruction-address-misaligned exception");
                     default: $fatal(1, "Unexpected extra exception");
                 endcase
                 trap_count <= trap_count + 1;
@@ -146,10 +149,10 @@ module tb_machine_exceptions;
         repeat (3) @(posedge clk);
         #1;
 
-        if (trap_count !== 4)
-            $fatal(1, "Observed %0d exceptions, expected 4", trap_count);
-        if (dut.u_id_regfile.regs[7] !== 32'd4)
-            $fatal(1, "Trap handler ran %0d times, expected 4",
+        if (trap_count !== 3)
+            $fatal(1, "Observed %0d exceptions, expected 3", trap_count);
+        if (dut.u_id_regfile.regs[7] !== 32'd3)
+            $fatal(1, "Trap handler ran %0d times, expected 3",
                    dut.u_id_regfile.regs[7]);
         if (dut.u_id_regfile.regs[2] !== 32'd32)
             $fatal(1, "Faulting load modified x2=%08h, expected reset value 00000020",
@@ -163,7 +166,7 @@ module tb_machine_exceptions;
                    dut.u_id_regfile.regs[12], dut.u_id_regfile.regs[14]);
 
         $display("*** MACHINE EXCEPTION TEST PASSED ***");
-        $display("Illegal, load/store misalignment, and instruction misalignment verified");
+        $display("Illegal/load/store traps and a halfword-aligned JALR target verified");
         $finish;
     end
 

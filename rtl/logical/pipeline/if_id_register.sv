@@ -18,12 +18,16 @@ module if_id_register #(
     input  logic             i_access_fault,
     input  logic [N-1:0]     i_pc,
     input  logic [N-1:0]     i_instruction,
+    input  logic [N-1:0]     i_raw_instruction,
+    input  logic             i_compressed,
     
     // Outputs to ID stage
     output logic             o_valid,
     output logic             o_access_fault,
     output logic [N-1:0]     o_pc,
-    output logic [N-1:0]     o_instruction
+    output logic [N-1:0]     o_instruction,
+    output logic [N-1:0]     o_raw_instruction,
+    output logic             o_compressed
 );
 
     always_ff @(posedge i_clk or negedge i_arst_n) begin
@@ -33,6 +37,8 @@ module if_id_register #(
             o_access_fault <= 1'b0;
             o_pc          <= 32'h0;
             o_instruction <= 32'h00000013;  // NOP
+            o_raw_instruction <= 32'h00000013;
+            o_compressed  <= 1'b0;
         end
         else if (i_flush) begin
             // Flush: Insert NOP (bubble)
@@ -40,6 +46,8 @@ module if_id_register #(
             o_access_fault <= 1'b0;
             o_pc          <= 32'h0;
             o_instruction <= 32'h00000013;  // NOP
+            o_raw_instruction <= 32'h00000013;
+            o_compressed  <= 1'b0;
         end
         else if (!i_stall) begin
             // Normal operation: Pass data through
@@ -47,6 +55,8 @@ module if_id_register #(
             o_access_fault <= i_access_fault;
             o_pc          <= i_pc;
             o_instruction <= i_instruction;
+            o_raw_instruction <= i_raw_instruction;
+            o_compressed  <= i_compressed;
         end
         // If stall: Keep current values (no else clause)
     end

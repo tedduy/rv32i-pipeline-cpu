@@ -4,7 +4,8 @@
 
 .PHONY: help all clean compile rtl-compile gl-compile run unit pipeline verify gl wave wave-gl \
 	vcs vcs-compile vcs-run vcs-gui vcs-regression verdi act-tools-check act-generate act-compile act-run \
-	act-regression act-zicsr act-zifencei act-zicntr act-zmmul act-sm-prepare act-sm-generate act-sm-exceptions \
+	act-regression act-zca act-zc-exceptions-generate act-zc-exceptions act-zicsr act-zifencei act-zicntr act-zmmul \
+	act-sm-prepare act-sm-generate act-sm-exceptions \
 	firmware-build firmware-run synth-dc synth-dc-ahb distclean
 
 # Default target
@@ -29,7 +30,7 @@ VCS_BUILD_ROOT = build/vcs
 ACT_CONFIG = rtl/sim/compliance/act4/test_config.yaml
 ACT_WORK_DIR = build/act4
 ACT_MAX_CYCLES ?= 1000000
-ACT_EXTENSIONS ?= I,Zicsr,Zifencei,Zicntr,Zmmul
+ACT_EXTENSIONS ?= I,Zca,Zicsr,Zifencei,Zicntr,Zmmul,ExceptionsZc
 ACT_EXCLUDE_EXTENSIONS ?=
 ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
@@ -59,7 +60,7 @@ FW_SIZE = $(RISCV_TOOLCHAIN_PREFIX)size
 FW_DIR = rtl/sim/firmware/smoke
 FW_BUILD_DIR = build/firmware/smoke
 FW_ELF = $(FW_BUILD_DIR)/smoke.elf
-FW_ARCH ?= rv32i_zicsr_zifencei_zmmul
+FW_ARCH ?= rv32ic_zicsr_zifencei_zmmul
 FW_CFLAGS = -march=$(FW_ARCH) -mabi=ilp32 -mcmodel=medlow -msmall-data-limit=0 \
 	-O2 -g -ffreestanding -fno-builtin -fno-common -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Werror
@@ -109,6 +110,7 @@ UNIT_TESTS = tb_alu_unit tb_multicycle_multiplier tb_register_file tb_immediate_
              tb_jump_unit tb_load_store_unit tb_control_unit tb_program_counter \
              tb_instruction_memory tb_data_memory
 UNIT_TESTS += tb_native_to_ahb_lite
+UNIT_TESTS += tb_rv32c_decompressor tb_rv32c_fetch_buffer
 
 INTEGRATION_TESTS = tb_rv32i_pipeline tb_full_verification tb_load_use_hazard \
                     tb_memory_wait_states tb_reset_vector tb_commit_interface \
@@ -338,6 +340,24 @@ act-run: act-compile
 act-regression: act-compile
 	@python3 scripts/run_act.py "$(ACT_ELF_DIR)" --simv "$(VCS_BUILD_ROOT)/tb_act/simv" \
 		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
+
+# Convenience target for the compressed-integer subset.
+act-zca: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zca
+act-zca: act-regression
+
+# ACT4 test generation is cached independently of the extension filter. Force
+# generation of the compressed-exception suite when it is not already present.
+act-zc-exceptions-generate: act-tools-check
+	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" -B tests \
+		EXTENSIONS=ExceptionsZc EXCLUDE_EXTENSIONS=
+	@mkdir -p "$(abspath $(ACT_WORK_DIR))/generated"
+	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" \
+		CONFIG_FILES="$(abspath $(ACT_CONFIG))" \
+		WORKDIR="$(abspath $(ACT_WORK_DIR))/generated" \
+		EXTENSIONS=ExceptionsZc EXCLUDE_EXTENSIONS=
+
+act-zc-exceptions: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/priv/ExceptionsZc
+act-zc-exceptions: act-regression
 
 # Convenience target for the Zicsr subset; avoids passing a long ACT_ELF_DIR.
 act-zicsr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zicsr

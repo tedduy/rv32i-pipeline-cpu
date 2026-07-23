@@ -88,15 +88,17 @@ module rv32i_core #(
     // ==========================================================================
     // IF Stage Signals
     // ==========================================================================
-    logic [N-1:0] if_pc_current, if_pc_next, if_pc_plus_4;
-    logic [N-1:0] if_instruction;
+    logic [N-1:0] if_pc_current, if_pc_next, if_pc_sequential;
+    logic [N-1:0] if_instruction, if_raw_instruction;
+    logic         if_complete, if_compressed, if_access_fault, if_consume;
     
     // ==========================================================================
     // IF/ID Pipeline Register Signals
     // ==========================================================================
     logic         id_valid;
     logic         id_instruction_access_fault;
-    logic [N-1:0] id_pc, id_instruction;
+    logic         id_compressed;
+    logic [N-1:0] id_pc, id_instruction, id_raw_instruction;
     
     // ==========================================================================
     // ID Stage Signals
@@ -124,7 +126,8 @@ module rv32i_core #(
     // ==========================================================================
     logic         ex_valid;
     logic         ex_instruction_access_fault;
-    logic [N-1:0] ex_pc, ex_instruction;
+    logic         ex_compressed;
+    logic [N-1:0] ex_pc, ex_instruction, ex_raw_instruction;
     logic [N-1:0] ex_rs1_data, ex_rs2_data, ex_immediate;
     logic [4:0]   ex_rs1_addr, ex_rs2_addr, ex_rd_addr;
     logic         ex_reg_write, ex_mem_read, ex_mem_write;
@@ -300,7 +303,7 @@ module rv32i_core #(
     assign o_imem_valid   = i_arst_n && !core_sleep;
     assign o_core_sleep   = core_sleep;
     assign o_fence_i      = fence_i_taken;
-    assign imem_wait      = o_imem_valid && !i_imem_ready;
+    assign imem_wait      = o_imem_valid && !if_complete;
 
     assign dmem_request   = mem_mem_read || mem_mem_write;
     assign o_dmem_valid   = dmem_request && !dmem_complete;
@@ -340,20 +343,17 @@ module rv32i_core #(
     // STAGE 1: INSTRUCTION FETCH (IF)
     // ==========================================================================
     
-    // PC + 4 calculation
-    adder_n_bit #(.N(N)) u_if_pc_adder (
-        .i_a  (if_pc_current),
-        .i_b  (32'd4),
-        .o_sum(if_pc_plus_4)
-    );
+    assign if_pc_sequential = if_pc_current +
+                              (if_compressed ? {{(N-2){1'b0}}, 2'd2}
+                                               : {{(N-3){1'b0}}, 3'd4});
     
     // PC next selection (from EX stage for branches/jumps)
     logic [31:0] branch_or_plus4;
     logic [31:0] normal_pc_next;
-    assign branch_or_plus4 = ex_branch_taken ? ex_pc_branch_target : if_pc_plus_4;
+    assign branch_or_plus4 = ex_branch_taken ? ex_pc_branch_target : if_pc_sequential;
     
     mux4to1 #(.N(32)) u_if_pc_mux (
-        .i_d0(if_pc_plus_4),
+        .i_d0(if_pc_sequential),
         .i_d1(branch_or_plus4),
         .i_d2(ex_jump_target),
         .i_d3(ex_jump_target),
@@ -378,10 +378,27 @@ module rv32i_core #(
         .o_pc(if_pc_current)
     );
     
-    // Instruction memory is outside the CPU core. Address and valid remain
-    // stable whenever the integration layer deasserts ready.
-    assign o_imem_addr  = if_pc_current;
-    assign if_instruction = i_imem_rdata;
+    // The external port always performs aligned 32-bit reads.  The fetch
+    // buffer selects/decompresses halfwords and assembles a 32-bit instruction
+    // that crosses a word boundary.
+    rv32c_fetch_buffer #(.N(N)) u_if_fetch_buffer (
+        .i_clk(i_clk),
+        .i_arst_n(i_arst_n),
+        .i_flush(system_redirect),
+        .i_consume(if_consume),
+        .i_pc(if_pc_current),
+        .i_response_valid(o_imem_valid && i_imem_ready),
+        .i_response_data(i_imem_rdata),
+        .i_response_error(i_imem_error === 1'b1),
+        .o_bus_addr(o_imem_addr),
+        .o_complete(if_complete),
+        .o_instruction(if_instruction),
+        .o_raw_instruction(if_raw_instruction),
+        .o_compressed(if_compressed),
+        .o_access_fault(if_access_fault)
+    );
+
+    assign if_consume = if_complete && !stall_if_id && !dmem_wait && !mul_stall;
 
     // A data transfer can finish while the instruction side is still waiting.
     // Remember completion, error and read data until the global pipeline can
@@ -410,15 +427,18 @@ module rv32i_core #(
         .i_arst_n(i_arst_n),
         .i_stall(stall_if_id || memory_stall),
         .i_flush(pipeline_flush_if_id),
-        .i_valid(o_imem_valid && i_imem_ready),
-        .i_access_fault(o_imem_valid && i_imem_ready &&
-                        (i_imem_error === 1'b1)),
+        .i_valid(if_complete),
+        .i_access_fault(if_access_fault),
         .i_pc(if_pc_current),
         .i_instruction(if_instruction),
+        .i_raw_instruction(if_raw_instruction),
+        .i_compressed(if_compressed),
         .o_valid(id_valid),
         .o_access_fault(id_instruction_access_fault),
         .o_pc(id_pc),
-        .o_instruction(id_instruction)
+        .o_instruction(id_instruction),
+        .o_raw_instruction(id_raw_instruction),
+        .o_compressed(id_compressed)
     );
     
     // ==========================================================================
@@ -527,6 +547,8 @@ module rv32i_core #(
         .i_access_fault(id_instruction_access_fault),
         .i_pc(id_pc),
         .i_instruction(id_instruction),
+        .i_raw_instruction(id_raw_instruction),
+        .i_compressed(id_compressed),
         .i_rs1_data(id_rs1_data),
         .i_rs2_data(id_rs2_data),
         .i_immediate(id_immediate),
@@ -559,6 +581,8 @@ module rv32i_core #(
         .o_access_fault(ex_instruction_access_fault),
         .o_pc(ex_pc),
         .o_instruction(ex_instruction),
+        .o_raw_instruction(ex_raw_instruction),
+        .o_compressed(ex_compressed),
         .o_rs1_data(ex_rs1_data),
         .o_rs2_data(ex_rs2_data),
         .o_immediate(ex_immediate),
@@ -701,6 +725,7 @@ module rv32i_core #(
         .i_immediate(ex_immediate),
         .i_jal(ex_jal),
         .i_jalr(ex_jalr),
+        .i_compressed(ex_compressed),
         .o_jump_target(ex_jump_target),
         .o_return_addr(ex_return_addr)
     );
@@ -741,7 +766,7 @@ module rv32i_core #(
                                                       : ex_jump_target;
     assign instruction_addr_misaligned = ex_valid &&
                                           (ex_branch_taken || ex_jal || ex_jalr) &&
-                                          (control_transfer_target[1:0] != 2'b00);
+                                          control_transfer_target[0];
 
     always_comb begin
         unique case (ex_mem_type)
@@ -782,8 +807,10 @@ module rv32i_core #(
                            !ex_sync_trap && !irq_take && !memory_stall;
     assign system_redirect = trap_enter || mret_taken || wfi_sleep || fence_i_taken;
     assign system_redirect_pc = trap_enter ? {csr_mtvec[N-1:2], 2'b00} :
-                                mret_taken ? {csr_mepc[N-1:2], 2'b00} :
-                                             ex_pc + {{(N-3){1'b0}}, 3'd4};
+                                mret_taken ? {csr_mepc[N-1:1], 1'b0} :
+                                ex_pc + (ex_compressed
+                                       ? {{(N-2){1'b0}}, 2'd2}
+                                       : {{(N-3){1'b0}}, 3'd4});
 
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n)
@@ -813,7 +840,7 @@ module rv32i_core #(
             trap_value = ex_pc;
         end else if (illegal_exception) begin
             trap_cause = {{(N-2){1'b0}}, 2'd2};
-            trap_value = ex_instruction;
+            trap_value = ex_raw_instruction;
         end else if (instruction_addr_misaligned) begin
             trap_cause = '0;
             trap_value = control_transfer_target;
@@ -872,7 +899,7 @@ module rv32i_core #(
         .i_flush(trap_enter),
         .i_valid(ex_valid),
         .i_pc(ex_pc),
-        .i_instruction(ex_instruction),
+        .i_instruction(ex_raw_instruction),
         .i_alu_result(ex_result),
         .i_rs2_data(ex_rs2_data_forwarded),
         .i_pc_branch_target(ex_pc_branch_target),
