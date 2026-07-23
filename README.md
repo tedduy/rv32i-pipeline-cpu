@@ -1,6 +1,17 @@
 # TDRV32
 
 [![CI](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml/badge.svg)](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml)
+[![RISC-V ISA](https://img.shields.io/badge/RISC--V-ISA-283272?logo=riscv)](https://github.com/riscv/riscv-isa-manual)
+[![OSS CAD Suite](https://img.shields.io/badge/OSS_CAD-Suite-4B32C3)](https://github.com/YosysHQ/oss-cad-suite-build)
+[![Verilator](https://img.shields.io/badge/Verilator-HDL-F2A900)](https://github.com/verilator/verilator)
+[![Icarus Verilog](https://img.shields.io/badge/Icarus-Verilog-0180C5)](https://github.com/steveicarus/iverilog)
+[![Yosys](https://img.shields.io/badge/Yosys-Synthesis-7E57C2)](https://github.com/YosysHQ/yosys)
+[![SymbiYosys](https://img.shields.io/badge/SymbiYosys-Formal-5C4EE5)](https://github.com/YosysHQ/sby)
+[![Boolector](https://img.shields.io/badge/Boolector-SMT-555555)](https://github.com/Boolector/boolector)
+[![Cocotb](https://img.shields.io/badge/Cocotb-Testbench-00A98F)](https://github.com/cocotb/cocotb)
+[![riscv-formal](https://img.shields.io/badge/riscv--formal-RVFI-283272)](https://github.com/YosysHQ/riscv-formal)
+[![RISC-V Architectural Tests](https://img.shields.io/badge/RISC--V-Architectural_Tests-283272)](https://github.com/riscv-non-isa/riscv-arch-test)
+[![OpenLane 2](https://img.shields.io/badge/OpenLane-2-1F6FEB)](https://github.com/efabless/openlane2)
 
 A 32-bit RISC-V CPU written in SystemVerilog with a five-stage pipeline:
 
@@ -97,22 +108,6 @@ Recommended starting points:
 
 See [`verification/README.md`](verification/README.md) for the verification
 plan and coverage policy.
-
-## Upstream Projects
-
-This project uses and builds upon the following open-source projects:
-
-- [RISC-V ISA Manual](https://github.com/riscv/riscv-isa-manual)
-- [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build)
-- [Verilator](https://github.com/verilator/verilator)
-- [Icarus Verilog](https://github.com/steveicarus/iverilog)
-- [Yosys](https://github.com/YosysHQ/yosys)
-- [SymbiYosys](https://github.com/YosysHQ/sby)
-- [Boolector](https://github.com/Boolector/boolector)
-- [Cocotb](https://github.com/cocotb/cocotb)
-- [riscv-formal](https://github.com/YosysHQ/riscv-formal)
-- [RISC-V Architectural Tests](https://github.com/riscv-non-isa/riscv-arch-test)
-- [OpenLane 2](https://github.com/efabless/openlane2)
 
 ## License
 
