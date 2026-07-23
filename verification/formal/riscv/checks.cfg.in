@@ -25,7 +25,7 @@ ill 12
 `define RISCV_FORMAL_ALIGNED_MEM
 
 [verilog-files]
-@basedir@/../../verification/formal/riscv/wrapper.sv
+@PROJECT_ROOT@/verification/formal/riscv/wrapper.sv
 @RTL_RISCV_FILES@
 
 [cover]

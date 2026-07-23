@@ -137,8 +137,9 @@ make clean      # Xóa toàn bộ artifact trong build/
 ```
 
 `make help` là mục lục các flow. Chi tiết verification nằm trong
-[`verification/README.md`](verification/README.md). CI GitHub chạy cùng lệnh
-`make ci`, nên kết quả local và pull request dùng chung một quality gate.
+[`verification/README.md`](verification/README.md). GitHub CI chia gate thành
+các khối static, simulator, random/coverage và formal chạy song song bằng cùng
+Docker image. `make ci` local còn chạy thêm synthesis sanity check.
 
 ## Docker CI image
 

@@ -49,12 +49,14 @@ def main() -> int:
         rendered = rendered.replace("@RTL_BASENAMES@", basename_lines)
         rendered = rendered.replace("@RTL_FILES@", "\n".join(sources))
     else:
+        project_root = Path.cwd().resolve()
         riscv_lines = "\n".join(
-            f"@basedir@/../../{source}" for source in sources
+            str((project_root / source).resolve()) for source in sources
         )
+        rendered = rendered.replace("@PROJECT_ROOT@", str(project_root))
         rendered = rendered.replace("@RTL_RISCV_FILES@", riscv_lines)
 
-    if "@RTL_" in rendered:
+    if "@RTL_" in rendered or "@PROJECT_ROOT@" in rendered:
         raise ValueError(f"unexpanded RTL marker in {args.template}")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
