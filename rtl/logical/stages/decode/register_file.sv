@@ -62,10 +62,17 @@ module register_file #(
     // register file while allowing an ASIC library to map the 1024 data bits
     // to smaller latch cells.  The storage deliberately has no reset; valid_q
     // provides the reset-visible architectural state.
-    always_latch begin
+    // Use the portable latch template instead of always_latch. Yosys expands a
+    // variable-indexed array write into address/data helper signals, which
+    // makes its strict always_latch check reject this otherwise valid storage.
+    /* verilator lint_off LATCH */
+    /* verilator lint_off COMBDLY */
+    always @(*) begin
         if (!i_clk && i_write_enable && (i_rd_addr != '0))
             storage[i_rd_addr] <= i_rd_data;
     end
+    /* verilator lint_on COMBDLY */
+    /* verilator lint_on LATCH */
 
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n)

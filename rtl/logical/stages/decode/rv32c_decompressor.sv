@@ -46,7 +46,7 @@ module rv32c_decompressor (
     endfunction
 
     function automatic logic [31:0] enc_b(
-        input logic [12:0] immediate,
+        input logic [12:1] immediate,
         input logic [4:0]  rs2_i,
         input logic [4:0]  rs1_i,
         input logic [2:0]  funct3_i
@@ -56,7 +56,7 @@ module rv32c_decompressor (
     endfunction
 
     function automatic logic [31:0] enc_j(
-        input logic [20:0] immediate,
+        input logic [20:1] immediate,
         input logic [4:0]  rd_i
     );
         enc_j = {immediate[20], immediate[10:1], immediate[11],
@@ -116,7 +116,7 @@ module rv32c_decompressor (
                                i_instruction[6], i_instruction[7],
                                i_instruction[2], i_instruction[11],
                                i_instruction[5:3], 1'b0};
-                        o_instruction = enc_j(imm[20:0], 5'd1);
+                        o_instruction = enc_j(imm[20:1], 5'd1);
                     end
                     3'b010: begin // C.LI
                         imm = {{26{i_instruction[12]}}, i_instruction[12],
@@ -184,13 +184,13 @@ module rv32c_decompressor (
                                i_instruction[6], i_instruction[7],
                                i_instruction[2], i_instruction[11],
                                i_instruction[5:3], 1'b0};
-                        o_instruction = enc_j(imm[20:0], 5'd0);
+                        o_instruction = enc_j(imm[20:1], 5'd0);
                     end
                     3'b110, 3'b111: begin // C.BEQZ / C.BNEZ
-                        imm = {{24{i_instruction[12]}}, i_instruction[12],
+                        imm = {{23{i_instruction[12]}}, i_instruction[12],
                                i_instruction[6:5], i_instruction[2],
                                i_instruction[11:10], i_instruction[4:3], 1'b0};
-                        o_instruction = enc_b(imm[12:0], 5'd0, rs1p,
+                        o_instruction = enc_b(imm[12:1], 5'd0, rs1p,
                                               i_instruction[13] ? 3'b001 : 3'b000);
                     end
                 endcase

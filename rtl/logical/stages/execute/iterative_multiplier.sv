@@ -14,12 +14,12 @@ module iterative_multiplier #(
 );
 
   localparam int COUNT_WIDTH = (N <= 2) ? 1 : $clog2(N);
+  localparam logic [COUNT_WIDTH-1:0] LAST_ITERATION = COUNT_WIDTH'(N - 1);
 
   localparam logic [3:0]
     ALU_MUL    = 4'b1010,
     ALU_MULH   = 4'b1011,
-    ALU_MULHSU = 4'b1100,
-    ALU_MULHU  = 4'b1101;
+    ALU_MULHSU = 4'b1100;
 
   typedef enum logic [1:0] {
     MUL_IDLE,
@@ -62,7 +62,7 @@ module iterative_multiplier #(
                                 ? (~magnitude_product_next + 1'b1)
                                 : magnitude_product_next;
   assign final_iteration = (state_q == MUL_RUN) &&
-                           (iteration_q == N-1);
+                           (iteration_q == LAST_ITERATION);
 
   assign o_busy = (state_q != MUL_IDLE);
   assign o_done = (state_q == MUL_DONE) || final_iteration;
@@ -96,7 +96,10 @@ module iterative_multiplier #(
             state_q <= MUL_IDLE;
         end
 
+        // Defensive recovery for an invalid encoded FSM state.
+        /* verilator coverage_off */
         default: state_q <= MUL_IDLE;
+        /* verilator coverage_on */
       endcase
     end
   end

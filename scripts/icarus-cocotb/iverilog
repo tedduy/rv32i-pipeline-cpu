@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+suite_root="${OSS_CAD_SUITE_ROOT:-${repo_root}/.tools/oss-cad-suite}"
+
+exec "${suite_root}/bin/iverilog" "$@"

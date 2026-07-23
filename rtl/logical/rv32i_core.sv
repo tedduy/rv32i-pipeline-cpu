@@ -61,8 +61,11 @@ module rv32i_core #(
     // Debug/Test outputs
     output logic [N-1:0] o_debug_pc,
     output logic [N-1:0] o_debug_instruction,
+    // Pure observability ports do not influence architectural behavior.
+    /* verilator coverage_off */
     output logic [N-1:0] o_debug_rs1_data,
     output logic [N-1:0] o_debug_rs2_data,
+    /* verilator coverage_on */
     output logic [N-1:0] o_debug_alu_operand_b,
     output logic [N-1:0] o_debug_branch_target,
     output logic [N-1:0] o_debug_alu_result,
@@ -110,7 +113,6 @@ module rv32i_core #(
     
     // ID Control signals
     logic        id_reg_write, id_mem_read, id_mem_write;
-    logic [2:0]  id_imm_sel;
     logic [1:0]  id_wb_sel, id_pc_sel;
     logic        id_alu_src, id_alu_a_sel;
     logic [3:0]  id_alu_ctrl;
@@ -145,9 +147,8 @@ module rv32i_core #(
     // EX Stage Signals
     // ==========================================================================
     logic [N-1:0] ex_alu_operand_a, ex_alu_operand_b;
-    logic [N-1:0] ex_alu_operand_a_forwarded, ex_alu_operand_b_forwarded;
+    logic [N-1:0] ex_alu_operand_a_forwarded;
     logic [N-1:0] ex_alu_result;
-    logic         ex_alu_zero;
     logic [N-1:0] ex_pc_branch_target;
     logic         ex_branch_taken;
     logic [N-1:0] ex_jump_target, ex_return_addr;
@@ -171,7 +172,9 @@ module rv32i_core #(
     logic [N-1:0] system_redirect_pc;
     logic [N-1:0] trap_vector_base, trap_vector_offset, trap_vector_pc;
     logic [N-1:0] control_transfer_target;
+    /* verilator coverage_off */
     logic         instruction_addr_misaligned;
+    /* verilator coverage_on */
     logic         data_addr_misaligned;
     logic         illegal_exception, load_misaligned_exception;
     logic         store_misaligned_exception;
@@ -185,7 +188,7 @@ module rv32i_core #(
     logic         mem_valid;
     logic [N-1:0] mem_pc, mem_instruction;
     logic [N-1:0] mem_alu_result, mem_rs2_data;
-    logic [N-1:0] mem_pc_branch_target, mem_jump_target, mem_return_addr;
+    logic [N-1:0] mem_return_addr;
     logic [N-1:0] mem_immediate;
     logic [4:0]   mem_rd_addr;
     logic         mem_branch_taken;
@@ -467,7 +470,6 @@ module rv32i_core #(
         .o_reg_write(id_reg_write),
         .o_mem_read(id_mem_read),
         .o_mem_write(id_mem_write),
-        .o_imm_sel(id_imm_sel),
         .o_wb_sel(id_wb_sel),
         .o_pc_sel(id_pc_sel),
         .o_alu_src(id_alu_src),
@@ -661,7 +663,10 @@ module rv32i_core #(
             2'b01:   mem_forward_data = mem_alu_result;
             2'b10:   mem_forward_data = mem_return_addr;
             2'b11:   mem_forward_data = mem_immediate;
+            // Every value of the two-bit selector is enumerated.
+            /* verilator coverage_off */
             default: mem_forward_data = mem_alu_result;
+            /* verilator coverage_on */
         endcase
     end
     
@@ -694,7 +699,9 @@ module rv32i_core #(
         .i_arst_n(i_arst_n),
         .i_valid(ex_valid),
         .i_instruction_access_fault(ex_instruction_access_fault),
-        .i_instruction(ex_instruction),
+        .i_funct7(ex_instruction[31:25]),
+        .i_funct3(ex_instruction[14:12]),
+        .i_opcode(ex_instruction[6:0]),
         .i_operand_a(ex_alu_operand_a),
         .i_operand_b(ex_alu_operand_b),
         .i_result_ready(!bus_stall),
@@ -708,8 +715,7 @@ module rv32i_core #(
         .i_operand_a(ex_alu_operand_a),
         .i_operand_b(ex_alu_operand_b),
         .i_alu_ctrl(ex_alu_ctrl),
-        .o_alu_result(ex_alu_result),
-        .o_zero_flag(ex_alu_zero)
+        .o_alu_result(ex_alu_result)
     );
     
     // Shared PC-relative target calculation for branches and JAL.
@@ -753,7 +759,10 @@ module rv32i_core #(
             2'b00: ex_csr_wdata = ex_csr_operand;
             2'b01: ex_csr_wdata = ex_csr_rdata | ex_csr_operand;
             2'b10: ex_csr_wdata = ex_csr_rdata & ~ex_csr_operand;
+            // ex_csr_op=3 is never produced by the CSR decoder.
+            /* verilator coverage_off */
             default: ex_csr_wdata = ex_csr_operand;
+            /* verilator coverage_on */
         endcase
     end
 
@@ -783,9 +792,13 @@ module rv32i_core #(
 
     assign control_transfer_target = ex_branch_taken ? ex_pc_branch_target
                                                       : ex_jump_target;
+    // RV32C makes IALIGN=16: branch/JAL offsets have bit 0 clear and JALR
+    // explicitly clears it, so this architectural exception is unreachable.
+    /* verilator coverage_off */
     assign instruction_addr_misaligned = ex_valid &&
-                                          (ex_branch_taken || ex_jal || ex_jalr) &&
-                                          control_transfer_target[0];
+                                         (ex_branch_taken || ex_jal || ex_jalr) &&
+                                         control_transfer_target[0];
+    /* verilator coverage_on */
 
     always_comb begin
         unique case (ex_mem_type)
@@ -832,7 +845,7 @@ module rv32i_core #(
                             ((irq_take && (csr_mtvec[1:0] == 2'b01))
                              ? trap_vector_offset : '0);
     assign system_redirect_pc = trap_enter ? trap_vector_pc :
-                                mret_taken ? {csr_mepc[N-1:1], 1'b0} :
+                                mret_taken ? csr_mepc :
                                 ex_pc + (ex_compressed
                                        ? {{(N-2){1'b0}}, 2'd2}
                                        : {{(N-3){1'b0}}, 3'd4});
@@ -866,9 +879,11 @@ module rv32i_core #(
         end else if (illegal_exception) begin
             trap_cause = {{(N-2){1'b0}}, 2'd2};
             trap_value = ex_raw_instruction;
+        /* verilator coverage_off */
         end else if (instruction_addr_misaligned) begin
             trap_cause = '0;
             trap_value = control_transfer_target;
+        /* verilator coverage_on */
         end else if (ex_ebreak) begin
             trap_cause = {{(N-2){1'b0}}, 2'd3};
         end else if (load_misaligned_exception) begin
@@ -927,8 +942,6 @@ module rv32i_core #(
         .i_instruction(ex_raw_instruction),
         .i_alu_result(ex_result),
         .i_rs2_data(ex_rs2_data_forwarded),
-        .i_pc_branch_target(ex_pc_branch_target),
-        .i_jump_target(ex_jump_target),
         .i_return_addr(ex_return_addr),
         .i_immediate(ex_immediate),
         .i_rd_addr(ex_rd_addr),
@@ -950,8 +963,6 @@ module rv32i_core #(
         .o_instruction(mem_instruction),
         .o_alu_result(mem_alu_result),
         .o_rs2_data(mem_rs2_data),
-        .o_pc_branch_target(mem_pc_branch_target),
-        .o_jump_target(mem_jump_target),
         .o_return_addr(mem_return_addr),
         .o_immediate(mem_immediate),
         .o_rd_addr(mem_rd_addr),

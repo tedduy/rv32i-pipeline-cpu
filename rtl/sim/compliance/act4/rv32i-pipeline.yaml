@@ -4,18 +4,18 @@ $schema: config_schema.json#
 kind: architecture configuration
 type: fully configured
 name: rv32i-pipeline
-description: RV32IC with Zicsr, Zifencei, Zicntr and Zmmul for the rv32i-pipeline CPU
+description: RV32IMC with Zicsr, Zifencei and Zicntr for the rv32i-pipeline CPU
 
 # Sm supplies the machine-mode architectural context used by the core's CSR,
 # trap and interrupt implementation. Zca is the integer compressed instruction
-# subset represented by the C bit in misa for this RV32I core.
+# subset represented by the C bit in misa for this RV32IM core.
 implemented_extensions:
   - { name: I, version: "= 2.1" }
   - { name: Zca, version: "= 1.0.0" }
   - { name: Zicsr, version: "= 2.0" }
   - { name: Zifencei, version: "= 2.0" }
   - { name: Zicntr, version: "= 2.0" }
-  - { name: Zmmul, version: "= 1.0.0" }
+  - { name: M, version: "= 2.0" }
   - { name: Sm, version: "= 1.12.0" }
 
 params:
@@ -46,6 +46,7 @@ params:
   MTVAL_WIDTH: 32
 
   MISA_CSR_IMPLEMENTED: true
+  MUTABLE_MISA_M: false
   MARCHID_IMPLEMENTED: false
   MIMPID_IMPLEMENTED: false
   VENDOR_ID_BANK: 0
@@ -53,8 +54,9 @@ params:
   CONFIG_PTR_ADDRESS: 0
 
   MTVEC_ACCESS: rw
-  MTVEC_MODES: [0]
+  MTVEC_MODES: [0, 1]
   MTVEC_BASE_ALIGNMENT_DIRECT: 4
+  MTVEC_BASE_ALIGNMENT_VECTORED: 4
   MTVEC_ILLEGAL_WRITE_BEHAVIOR: custom
 
   PMA_GRANULARITY: 2

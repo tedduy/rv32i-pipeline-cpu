@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+suite_root="${OSS_CAD_SUITE_ROOT:-${repo_root}/.tools/oss-cad-suite}"
+
+# The OSS CAD Suite bin/vvp wrapper sets PYTHONHOME to its bundled Python.
+# That is correct for Suite Python tools, but prevents cocotb from embedding
+# the host-compatible Python selected by cocotb-config.
+unset PYTHONHOME
+unset PYTHONEXECUTABLE
+
+# Icarus VPI modules need the newer C++ runtime and the libbz2 SONAME shipped
+# by OSS CAD Suite. Preload only those libraries; exposing the entire Suite
+# library directory would override host OpenSSL and break system Python.
+suite_preload="${suite_root}/lib/libstdc++.so.6"
+suite_preload+="${suite_preload:+:}${suite_root}/lib/libgcc_s.so.1"
+suite_preload+="${suite_preload:+:}${suite_root}/lib/libbz2.so.1.0"
+export LD_PRELOAD="${suite_preload}${LD_PRELOAD:+:${LD_PRELOAD}}"
+
+exec "${suite_root}/libexec/vvp" "$@"

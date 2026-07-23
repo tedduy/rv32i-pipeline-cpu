@@ -22,7 +22,10 @@ module mux3to1 #(
             2'b00:   o_y = i_d0;
             2'b01:   o_y = i_d1;
             2'b10:   o_y = i_d2;
+            // i_sel=3 is excluded by the forwarding controller.
+            /* verilator coverage_off */
             default: o_y = '0;
+            /* verilator coverage_on */
         endcase
     end
 

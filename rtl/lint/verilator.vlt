@@ -1,0 +1,23 @@
+`verilator_config
+
+// rv32i_top intentionally drops the core's optional debug-only outputs. The
+// native read qualifier and byte strobes are redundant after conversion to AHB,
+// which derives transfers from valid/write/address/size.
+lint_off -rule PINCONNECTEMPTY -file "*rtl/logical/rv32i_top.sv" -match "Instance pin connected by name with empty reference: 'o_debug_*'*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/rv32i_top.sv" -match "Signal is not used: 'dmem_read'*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/rv32i_top.sv" -match "Signal is not used: 'dmem_wstrb'*"
+
+// The decoded instruction remains a standard 32-bit payload through EX. rd is
+// carried separately, so those five encoding bits are intentionally unused.
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/rv32i_core.sv" -match "Bits of signal are not used: 'ex_instruction'[11:7]*"
+
+// IALIGN=16 makes architectural instruction/trap addresses halfword aligned.
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/stages/fetch/rv32c_fetch_buffer.sv" -match "Bits of signal are not used: 'i_pc'[0]*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/stages/system/csr_file.sv" -match "Bits of signal are not used: 'i_trap_pc'[0]*"
+
+// x0 is hardwired to zero and never needs a valid storage entry.
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/stages/decode/register_file.sv" -match "Bits of signal are not used: 'valid_q'[0]*"
+
+// The final carry-select block deliberately discards the carry beyond bit N-1.
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/common/adder_n_bit.sv" -match "Bits of signal are not used: 'sum_carry_0'[8]*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/common/adder_n_bit.sv" -match "Bits of signal are not used: 'sum_carry_1'[8]*"

@@ -8,7 +8,9 @@ module mdu_unit #(
   input  logic             i_arst_n,
   input  logic             i_valid,
   input  logic             i_instruction_access_fault,
-  input  logic [31:0]      i_instruction,
+  input  logic [6:0]       i_funct7,
+  input  logic [2:0]       i_funct3,
+  input  logic [6:0]       i_opcode,
   input  logic [N-1:0]     i_operand_a,
   input  logic [N-1:0]     i_operand_b,
   input  logic             i_result_ready,
@@ -39,9 +41,9 @@ module mdu_unit #(
     multiply_control = ALU_MUL;
 
     if (i_valid && !i_instruction_access_fault) begin
-      case ({i_instruction[31:25], i_instruction[6:0]})
+      case ({i_funct7, i_opcode})
         {7'b0000001, 7'b0110011}: begin
-          case (i_instruction[14:12])
+          case (i_funct3)
             3'b000: begin
               o_active         = 1'b1;
               multiply_control = ALU_MUL;
@@ -62,7 +64,10 @@ module mdu_unit #(
               o_active      = 1'b1;
               select_divide = 1'b1;
             end
+            // funct3 is constrained to the eight RV32M operations.
+            /* verilator coverage_off */
             default: begin end
+            /* verilator coverage_on */
           endcase
         end
         default: begin end
@@ -104,7 +109,7 @@ module mdu_unit #(
     .i_consume(divide_consume),
     .i_dividend(i_operand_a),
     .i_divisor(i_operand_b),
-    .i_operation(i_instruction[13:12]),
+    .i_operation(i_funct3[1:0]),
     .o_busy(divide_busy),
     .o_done(divide_done),
     .o_result(divide_result)

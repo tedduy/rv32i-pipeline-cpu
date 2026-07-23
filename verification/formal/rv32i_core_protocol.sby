@@ -1,0 +1,73 @@
+[tasks]
+bmc
+cover
+
+[options]
+multiclock on
+bmc: mode bmc
+bmc: depth 40
+cover: mode cover
+cover: depth 40
+
+[engines]
+smtbmc boolector
+
+[script]
+read -formal -sv \
+    adder_n_bit.sv \
+    mux2to1.sv \
+    mux3to1.sv \
+    mux4to1.sv \
+    program_counter.sv \
+    rv32c_fetch_buffer.sv \
+    control_unit.sv \
+    immediate_generator.sv \
+    register_file.sv \
+    rv32c_decompressor.sv \
+    alu_unit.sv \
+    iterative_multiplier.sv \
+    iterative_divider.sv \
+    mdu_unit.sv \
+    branch_unit.sv \
+    jump_unit.sv \
+    load_store_unit.sv \
+    csr_file.sv \
+    if_id_register.sv \
+    id_ex_register.sv \
+    ex_mem_register.sv \
+    mem_wb_register.sv \
+    forwarding_unit.sv \
+    hazard_detection_unit.sv \
+    rv32i_core.sv \
+    rv32i_core_protocol.sv
+prep -top rv32i_core_protocol_formal
+async2sync
+dffunmap
+
+[files]
+rtl/logical/common/adder_n_bit.sv
+rtl/logical/common/mux2to1.sv
+rtl/logical/common/mux3to1.sv
+rtl/logical/common/mux4to1.sv
+rtl/logical/stages/fetch/program_counter.sv
+rtl/logical/stages/fetch/rv32c_fetch_buffer.sv
+rtl/logical/stages/decode/control_unit.sv
+rtl/logical/stages/decode/immediate_generator.sv
+rtl/logical/stages/decode/register_file.sv
+rtl/logical/stages/decode/rv32c_decompressor.sv
+rtl/logical/stages/execute/alu_unit.sv
+rtl/logical/stages/execute/iterative_multiplier.sv
+rtl/logical/stages/execute/iterative_divider.sv
+rtl/logical/stages/execute/mdu_unit.sv
+rtl/logical/stages/execute/branch_unit.sv
+rtl/logical/stages/execute/jump_unit.sv
+rtl/logical/stages/memory/load_store_unit.sv
+rtl/logical/stages/system/csr_file.sv
+rtl/logical/pipeline/if_id_register.sv
+rtl/logical/pipeline/id_ex_register.sv
+rtl/logical/pipeline/ex_mem_register.sv
+rtl/logical/pipeline/mem_wb_register.sv
+rtl/logical/hazard/forwarding_unit.sv
+rtl/logical/hazard/hazard_detection_unit.sv
+rtl/logical/rv32i_core.sv
+verification/formal/rv32i_core_protocol.sv

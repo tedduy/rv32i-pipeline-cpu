@@ -125,7 +125,10 @@ module rv32c_fetch_buffer #(
         end else if (i_response_valid) begin
             if (!i_response_error && starts_cross_word) begin
                 cross_pending_q <= 1'b1;
-            end else if (o_complete) begin
+            end else begin
+                // Every remaining valid response is complete: it is either
+                // the second cross-word beat, an error, or a non-crossing
+                // instruction.
                 cross_pending_q <= 1'b0;
                 if (!i_consume) begin
                     response_held_q <= 1'b1;
@@ -143,7 +146,7 @@ module rv32c_fetch_buffer #(
         if (!i_flush && !response_held_q && i_response_valid) begin
             if (!i_response_error && starts_cross_word)
                 first_half_q <= i_response_data[31:16];
-            else if (o_complete && !i_consume)
+            else if (!i_consume)
                 held_response_q <= cross_pending_q
                                  ? {i_response_data[15:0], first_half_q}
                                  : i_response_data;

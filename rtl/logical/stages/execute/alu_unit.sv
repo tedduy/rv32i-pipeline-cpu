@@ -4,8 +4,7 @@ module alu_unit #(
   input  logic [N-1:0] i_operand_a,
   input  logic [N-1:0] i_operand_b,
   input  logic [3:0]   i_alu_ctrl,
-  output logic [N-1:0] o_alu_result,
-  output logic         o_zero_flag
+  output logic [N-1:0] o_alu_result
 );
 
   // ALU operations cho 19 instructions:
@@ -46,6 +45,4 @@ module alu_unit #(
   end
 
   assign o_alu_result = result;
-  assign o_zero_flag = (result == 32'd0);
-
 endmodule

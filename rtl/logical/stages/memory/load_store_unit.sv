@@ -39,7 +39,9 @@ module load_store_unit #(
             2'b01: o_load_data = {{24{i_mem_read_data[15]}}, i_mem_read_data[15:8]};
             2'b10: o_load_data = {{24{i_mem_read_data[23]}}, i_mem_read_data[23:16]};
             2'b11: o_load_data = {{24{i_mem_read_data[31]}}, i_mem_read_data[31:24]};
-            default: o_load_data = '0;
+            /* verilator coverage_off */
+            default: o_load_data = '0; // All two-bit offsets are enumerated.
+            /* verilator coverage_on */
           endcase
         end
         
@@ -47,7 +49,9 @@ module load_store_unit #(
           case (i_byte_offset[1])
             1'b0: o_load_data = {{16{i_mem_read_data[15]}}, i_mem_read_data[15:0]};
             1'b1: o_load_data = {{16{i_mem_read_data[31]}}, i_mem_read_data[31:16]};
-            default: o_load_data = '0;
+            /* verilator coverage_off */
+            default: o_load_data = '0; // Both one-bit offsets are enumerated.
+            /* verilator coverage_on */
           endcase
         end
         
@@ -61,7 +65,9 @@ module load_store_unit #(
             2'b01: o_load_data = {24'b0, i_mem_read_data[15:8]};
             2'b10: o_load_data = {24'b0, i_mem_read_data[23:16]};
             2'b11: o_load_data = {24'b0, i_mem_read_data[31:24]};
-            default: o_load_data = '0;
+            /* verilator coverage_off */
+            default: o_load_data = '0; // All two-bit offsets are enumerated.
+            /* verilator coverage_on */
           endcase
         end
         
@@ -69,7 +75,9 @@ module load_store_unit #(
           case (i_byte_offset[1])
             1'b0: o_load_data = {16'b0, i_mem_read_data[15:0]};
             1'b1: o_load_data = {16'b0, i_mem_read_data[31:16]};
-            default: o_load_data = '0;
+            /* verilator coverage_off */
+            default: o_load_data = '0; // Both one-bit offsets are enumerated.
+            /* verilator coverage_on */
           endcase
         end
         
@@ -102,10 +110,12 @@ module load_store_unit #(
               o_store_data = {i_store_data[7:0], 24'b0};
               o_byte_enable = 4'b1000;
             end
-            default: begin
+            /* verilator coverage_off */
+            default: begin // All two-bit offsets are enumerated.
               o_store_data = '0;
               o_byte_enable = 4'b0000;
             end
+            /* verilator coverage_on */
           endcase
         end
         
@@ -119,10 +129,12 @@ module load_store_unit #(
               o_store_data = {i_store_data[15:0], 16'b0};
               o_byte_enable = 4'b1100;
             end
-            default: begin
+            /* verilator coverage_off */
+            default: begin // Both one-bit offsets are enumerated.
               o_store_data = '0;
               o_byte_enable = 4'b0000;
             end
+            /* verilator coverage_on */
           endcase
         end
         

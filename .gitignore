@@ -9,6 +9,7 @@
 
 # Local environment
 .env
+.venv/
 .cache/
 .tools/
 __pycache__/
@@ -71,6 +72,9 @@ fpga/**/timing/
 
 # Generic build outputs
 build/
+moduleparamid
+results.xml
+verification/formal/*/
 *.log
 *.tmp
 *.out

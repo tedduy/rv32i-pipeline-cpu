@@ -14,9 +14,6 @@ module adder_n_bit #(
         end else begin : g_carry_select
             localparam integer BLOCK_COUNT =
                 (N + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
-            logic [BLOCK_COUNT:0] carry;
-
-            assign carry[0] = 1'b0;
 
             for (genvar block_index = 0;
                  block_index < BLOCK_COUNT;
@@ -27,6 +24,14 @@ module adder_n_bit #(
                     ? BLOCK_WIDTH : (N - BLOCK_LSB);
                 logic [THIS_WIDTH:0] sum_carry_0;
                 logic [THIS_WIDTH:0] sum_carry_1;
+                logic                  carry_in;
+
+                if (block_index == 0) begin : g_first_carry
+                    assign carry_in = 1'b0;
+                end else begin : g_chained_carry
+                    assign carry_in =
+                        g_block[block_index-1].g_carry_out.carry_out;
+                end
 
                 assign sum_carry_0 =
                     {1'b0, i_a[BLOCK_LSB +: THIS_WIDTH]} +
@@ -37,13 +42,16 @@ module adder_n_bit #(
                     {{THIS_WIDTH{1'b0}}, 1'b1};
 
                 assign o_sum[BLOCK_LSB +: THIS_WIDTH] =
-                    carry[block_index]
+                    carry_in
                     ? sum_carry_1[THIS_WIDTH-1:0]
                     : sum_carry_0[THIS_WIDTH-1:0];
-                assign carry[block_index + 1] =
-                    carry[block_index]
-                    ? sum_carry_1[THIS_WIDTH]
-                    : sum_carry_0[THIS_WIDTH];
+                if (block_index < BLOCK_COUNT - 1) begin : g_carry_out
+                    logic carry_out;
+                    assign carry_out =
+                        carry_in
+                        ? sum_carry_1[THIS_WIDTH]
+                        : sum_carry_0[THIS_WIDTH];
+                end
             end
         end
     endgenerate

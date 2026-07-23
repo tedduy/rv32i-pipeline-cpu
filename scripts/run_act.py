@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one ELF or a directory of self-checking RISC-V ELFs with VCS."""
+"""Run one ELF or a directory of self-checking RISC-V ELFs."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def discover(path: Path) -> list[Path]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="ELF or directory containing ELFs")
-    parser.add_argument("--simv", type=Path, required=True, help="compiled tb_act VCS executable")
+    parser.add_argument("--simv", type=Path, required=True, help="compiled tb_act simulator image")
     parser.add_argument("--work-dir", type=Path, default=Path("build/act4"))
     parser.add_argument("--max-cycles", type=int, default=1_000_000)
     parser.add_argument("--memory-bytes", type=int, default=1024 * 1024)
@@ -37,7 +37,7 @@ def main() -> int:
     if not tests:
         parser.error(f"no .elf tests found at {args.input}")
     if not args.simv.is_file():
-        parser.error(f"VCS executable not found: {args.simv}")
+        parser.error(f"simulator image not found: {args.simv}")
 
     args.work_dir.mkdir(parents=True, exist_ok=True)
     passed = 0

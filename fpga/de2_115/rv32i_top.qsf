@@ -68,6 +68,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/decode/r
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/decode/rv32c_decompressor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/alu_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/iterative_multiplier.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/iterative_divider.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/mdu_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/branch_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/execute/jump_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/stages/memory/load_store_unit.sv

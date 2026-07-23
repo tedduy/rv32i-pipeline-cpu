@@ -14,6 +14,7 @@ module iterative_divider #(
 );
 
   localparam int COUNT_WIDTH = (N <= 2) ? 1 : $clog2(N);
+  localparam logic [COUNT_WIDTH-1:0] LAST_ITERATION = COUNT_WIDTH'(N - 1);
 
   typedef enum logic [1:0] {
     DIV_IDLE,
@@ -24,7 +25,7 @@ module iterative_divider #(
   div_state_t state_q;
   logic [COUNT_WIDTH-1:0] iteration_q;
   logic [N-1:0] dividend_q, divisor_q, quotient_q;
-  logic [N:0] remainder_q;
+  logic [N-1:0] remainder_q;
   logic quotient_negative_q, remainder_negative_q;
   logic select_remainder_q, special_q;
   logic [N-1:0] special_result_q;
@@ -34,7 +35,7 @@ module iterative_divider #(
   logic [N-1:0] dividend_magnitude, divisor_magnitude;
   logic divide_by_zero, signed_overflow;
   logic [N:0] shifted_remainder;
-  logic [N:0] remainder_next;
+  logic [N-1:0] remainder_next;
   logic [N-1:0] dividend_next, quotient_next;
   logic [N-1:0] quotient_corrected, remainder_corrected;
   logic [N-1:0] normal_result_next;
@@ -57,20 +58,20 @@ module iterative_divider #(
   assign shifted_remainder = {remainder_q[N-1:0], dividend_q[N-1]};
   assign dividend_next = {dividend_q[N-2:0], 1'b0};
   assign remainder_next = (shifted_remainder >= {1'b0, divisor_q})
-                        ? shifted_remainder - {1'b0, divisor_q}
-                        : shifted_remainder;
+                        ? shifted_remainder[N-1:0] - divisor_q
+                        : shifted_remainder[N-1:0];
   assign quotient_next = {quotient_q[N-2:0],
                           shifted_remainder >= {1'b0, divisor_q}};
 
   assign quotient_corrected = quotient_negative_q
                             ? (~quotient_next + 1'b1) : quotient_next;
   assign remainder_corrected = remainder_negative_q
-                             ? (~remainder_next[N-1:0] + 1'b1)
-                             : remainder_next[N-1:0];
+                             ? (~remainder_next + 1'b1)
+                             : remainder_next;
   assign normal_result_next = select_remainder_q ? remainder_corrected
                                                   : quotient_corrected;
   assign final_iteration = (state_q == DIV_RUN) &&
-                           (iteration_q == N-1);
+                           (iteration_q == LAST_ITERATION);
 
   assign o_busy = (state_q != DIV_IDLE);
   assign o_done = (state_q == DIV_DONE) || final_iteration;
@@ -102,7 +103,10 @@ module iterative_divider #(
             state_q <= DIV_IDLE;
         end
 
+        // Defensive recovery for an invalid encoded FSM state.
+        /* verilator coverage_off */
         default: state_q <= DIV_IDLE;
+        /* verilator coverage_on */
       endcase
     end
   end
@@ -136,7 +140,7 @@ module iterative_divider #(
         if (final_iteration) begin
           if (!special_q) begin
             quotient_q  <= quotient_corrected;
-            remainder_q <= {1'b0, remainder_corrected};
+            remainder_q <= remainder_corrected;
           end
         end else begin
           if (!special_q) begin

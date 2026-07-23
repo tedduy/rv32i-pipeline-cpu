@@ -1,0 +1,18 @@
+{
+  "minimum_hits": 1,
+  "max_reported_misses": 100,
+  "thresholds": {
+    "line": 100.0,
+    "branch": 100.0,
+    "expr": 100.0,
+    "fsm_state": 100.0,
+    "toggle": 90.0
+  },
+  "goal": {
+    "line": 100.0,
+    "branch": 100.0,
+    "expr": 100.0,
+    "fsm_state": 100.0,
+    "toggle": 90.0
+  }
+}

@@ -1,4 +1,4 @@
-# RV32IC 5-Stage Pipeline CPU
+# RV32IMC 5-Stage Pipeline CPU
 
 CPU RISC-V 32-bit triển khai bằng SystemVerilog, sử dụng pipeline 5 tầng:
 
@@ -17,14 +17,13 @@ identification/configuration CSR. `mhartid` cùng các ID có thể cấu hình 
 tham số top-level. Ba ngõ vào interrupt đồng bộ với clock hỗ trợ machine
 software, timer và external interrupt.
 
-ISA hiện tại là RV32IC cùng `Zicsr`, `Zifencei`, `Zicntr` và `Zmmul`. Phần
+ISA hiện tại là RV32IMC cùng `Zicsr`, `Zifencei` và `Zicntr`. Phần
 `Zca` của compressed extension được giải nén ở fetch stage; PC tiến thêm 2 hoặc
 4 byte và fetch buffer ghép được lệnh 32-bit bắt đầu tại nửa trên của một word.
-Zmmul cung
-cấp `MUL`, `MULH`, `MULHSU` và `MULHU` qua multiplier iterative radix-2. Phần
-cứng dùng một bước shift-add mỗi chu kỳ và hoàn tất sau 32 chu kỳ, ưu tiên area
-nhỏ cho MCU hơn throughput MUL. Pipeline giữ instruction ở EX cho tới khi kết
-quả sẵn sàng. Các phép chia của full M extension chưa được triển khai.
+Full M cung cấp bốn phép nhân qua multiplier iterative và `DIV`, `DIVU`, `REM`,
+`REMU` qua divider restoring radix-2. Cả hai datapath thực hiện một bước mỗi
+chu kỳ và hoàn tất sau 32 chu kỳ, ưu tiên area nhỏ cho MCU hơn throughput.
+Pipeline giữ instruction ở EX cho tới khi kết quả sẵn sàng.
 
 Illegal instruction, truy cập CSR không được hỗ trợ và địa chỉ load/store lệch
 alignment đều tạo precise exception trước khi instruction gây lỗi tạo side
@@ -53,9 +52,9 @@ tín hiệu debug nội bộ.
 2. [`rtl/logical/pipeline/`](rtl/logical/pipeline/) — bốn ranh giới của pipeline.
 3. [`rtl/logical/stages/fetch/rv32c_fetch_buffer.sv`](rtl/logical/stages/fetch/rv32c_fetch_buffer.sv) và
    [`rtl/logical/stages/decode/rv32c_decompressor.sv`](rtl/logical/stages/decode/rv32c_decompressor.sv) — fetch và giải nén RV32C.
-4. [`rtl/logical/stages/execute/alu_unit.sv`](rtl/logical/stages/execute/alu_unit.sv) — datapath thực thi.
+4. [`rtl/logical/stages/execute/`](rtl/logical/stages/execute/) — ALU cùng multiplier/divider iterative.
 5. [`rtl/logical/hazard/`](rtl/logical/hazard/) — stall, flush và forwarding.
-6. [`rtl/sim/integration/tb_rv32i_pipeline.sv`](rtl/sim/integration/tb_rv32i_pipeline.sv) — luồng kiểm thử toàn CPU.
+6. [`verification/cocotb/test_core.py`](verification/cocotb/test_core.py) — scoreboard và kiểm thử toàn CPU qua public interface.
 
 ## Cấu trúc repo
 
@@ -70,13 +69,17 @@ rv32i-pipeline-cpu/
 │   │   ├── hazard/           # Forwarding và hazard detection
 │   │   ├── bus/              # Native-to-AHB-Lite bridge
 │   │   └── common/           # Adder và mux dùng chung
-│   ├── sim/                  # Unit, integration, ACT4 và gate-level TB
+│   ├── lint/                 # Verilator lint policy
+│   ├── sim/                  # ACT4 harness và firmware mô phỏng
 │   ├── syn/                  # Synthesis flows
 │   ├── sdc/                  # Timing constraints
-│   ├── lint/                 # Lint rules và waivers
 │   ├── cdc/                  # Clock-domain crossing collateral
 │   ├── rdc/                  # Reset-domain crossing collateral
 │   └── doc/                  # RTL và verification documents
+├── verification/
+│   ├── cocotb/               # Testbench kiến trúc và unit coverage
+│   └── formal/               # SymbiYosys properties
+├── mk/                       # Các flow được Makefile nạp
 ├── fpga/
 │   └── de2_115/
 ├── asic/
@@ -95,74 +98,55 @@ rv32i-pipeline-cpu/
 - `rv32i_core` là native-bus core; `rv32i_top` là public AHB-Lite wrapper.
 - FPGA wrapper có thể dùng trực tiếp `rv32i_core` với memory subsystem của board.
 
-## Chạy simulation
+## Quick start cho checkout mới
 
-Yêu cầu:
+Flow mặc định chỉ dùng công cụ open-source:
 
-- QuestaSim hoặc ModelSim (`vlib`, `vlog`, `vsim`).
-- GNU Make.
+- GNU Make, `curl`, `tar` và Python 3 có hỗ trợ `venv`.
+- OSS CAD Suite: Verilator, Icarus Verilog, Yosys, SymbiYosys và Boolector.
+- Cocotb được cài riêng vào `.venv` để tương thích với Python của hệ thống.
 
-```bash
-# Compile RTL và toàn bộ RTL testbench
-make rtl-compile
-
-# Chạy toàn bộ unit testbench
-make unit
-
-# Chạy pipeline integration test
-make pipeline
-
-# Chạy write-back verification
-make verify
-
-# Kiểm tra thứ tự retire và side effect
-make vcs TB=tb_commit_interface
-
-# Kiểm tra CSR, ECALL, trap handler và MRET
-make vcs TB=tb_machine_csr_trap
-
-# Kiểm tra machine external interrupt
-make vcs TB=tb_machine_external_interrupt
-
-# Kiểm tra illegal instruction và misaligned access
-make vcs TB=tb_machine_exceptions
-
-# Kiểm tra misa và nhóm machine identification CSR
-make vcs TB=tb_machine_identification_csrs
-
-# Mở waveform của pipeline
-make wave TB=tb_rv32i_pipeline
-
-# Xóa simulation artifacts
-make clean
-```
-
-`make compile` là alias của `make rtl-compile`; gate-level không còn bị compile bắt buộc cùng RTL.
-
-## Gate-level simulation
-
-Netlist được lưu tại:
-
-```text
-asic/sky130/netlist/rv32i_top.v
-```
-
-Gate-level simulation cần Sky130 PDK:
+Cài OSS CAD Suite vào repo (Linux x64):
 
 ```bash
-make gl PDK_ROOT=/path/to/sky130/pdk
+mkdir -p .tools
+curl -L --fail --retry 3 \
+  -o /tmp/oss-cad-suite.tgz \
+  https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-05-08/oss-cad-suite-linux-x64-20260508.tgz
+tar -xzf /tmp/oss-cad-suite.tgz -C .tools
 ```
 
-Hai file list được dùng là:
+Mỗi terminal mới cần kích hoạt toolchain, sau đó tạo môi trường Python:
 
-- [`rtl/sim/filelist.f`](rtl/sim/filelist.f) — RTL và testbench.
-- [`rtl/sim/filelist_netlist.f`](rtl/sim/filelist_netlist.f) — Sky130 netlist và gate-level testbench.
+```bash
+source .tools/oss-cad-suite/environment
+make verification-setup
+make doctor
+```
+
+Các lệnh thường dùng:
+
+```bash
+make test       # Cocotb trên cả Verilator và Icarus
+make lint       # Dùng setup và ghi report trong rtl/lint/
+make coverage   # Code-coverage ratchet + functional bins 100%
+make ci         # Lint + test + random + coverage + synthesis + formal
+make clean      # Xóa toàn bộ artifact trong build/
+```
+
+`make help` là mục lục các flow. Chi tiết verification nằm trong
+[`verification/README.md`](verification/README.md). CI GitHub chạy cùng lệnh
+`make ci`, nên kết quả local và pull request dùng chung một quality gate.
+
+ACT4 và RISC-V GCC là dependency tùy chọn, không cần để chạy `make ci`. Chúng
+chỉ cần cho architectural compliance và firmware smoke test; kiểm tra môi
+trường riêng bằng `make act-tools-check`.
 
 ## Architectural compliance (ACT4)
 
 Thư mục [`rtl/sim/compliance/act4/`](rtl/sim/compliance/act4/) chứa cấu hình cho flow ACT4 chính
-thức. Profile hiện tại kiểm tra `I`, `Zca`, `Zicsr`, `Zifencei`, `Zicntr` và
-`Zmmul`; machine-mode `Sm` cung cấp architectural context. `ExceptionsSm` được
+thức. Profile hiện tại kiểm tra `I`, `M`, `Zca`, `Zicsr`, `Zifencei` và
+`Zicntr`; machine-mode `Sm` cung cấp architectural context. `ExceptionsSm` được
 điều chỉnh cho `IALIGN=16`, còn `ExceptionsZc` kiểm tra illegal compressed
 encoding và `C.EBREAK`.
 
@@ -190,6 +174,9 @@ make act-zc-exceptions
 
 # Chỉ chạy sáu ELF Zicsr
 make act-zicsr
+
+# Chạy tám ELF multiply/divide của full M
+make act-m
 ```
 
 Có thể override `ACT_ROOT`, `ACT_TOOL_ROOT` hoặc `ACT_ELF_DIR` nếu muốn dùng
@@ -202,9 +189,9 @@ tiếp các segment ELF32 little-endian nên bước chạy DUT không phụ thu
 ## Bare-metal C firmware
 
 `rtl/sim/firmware/smoke/` chứa startup assembly, linker script và chương trình C
-freestanding được biên dịch cho `rv32ic_zicsr_zifencei_zmmul` và link tại reset
+freestanding được biên dịch cho `rv32imc_zicsr_zifencei` và link tại reset
 vector `0x0000_0000`. Firmware khởi tạo stack,
-xóa `.bss`, cài `mtvec`, kiểm tra bốn lệnh Zmmul, đọc `cycle`/`instret`, thực thi
+xóa `.bss`, cài `mtvec`, kiểm tra tám lệnh M, đọc `cycle`/`instret`, thực thi
 `FENCE.I` và in kết quả qua UART mô phỏng tại `0x1000_0000`.
 
 Flow dùng GCC nằm trong `.tools/act4/toolchain/`, không sửa `PATH` hoặc cài
@@ -214,7 +201,7 @@ toolchain vào hệ thống:
 # Tạo ELF, map và disassembly trong build/firmware/smoke/
 make firmware-build
 
-# Compile ELF harness bằng VCS rồi chạy firmware
+# Compile ELF harness bằng Icarus rồi chạy firmware
 make firmware-run
 ```
 
@@ -222,41 +209,12 @@ Firmware báo pass bằng cách ghi giá trị `1` tới thanh ghi trạng thái
 tại `0x2000_0000`. Exception hoặc interrupt ngoài dự kiến đi vào `trap_entry`
 và báo fail.
 
-## Synthesis với Design Compiler
+## Synthesis sanity check
 
-Flow tại [`rtl/syn/dc/run.tcl`](rtl/syn/dc/run.tcl) tổng hợp trực tiếp RTL hiện tại,
-tạo netlist và các báo cáo area, timing, QoR trong `build/synth/dc/`. Mặc định
-flow tổng hợp native core `rv32i_core` với clock 10 ns (100 MHz):
-
-```bash
-make synth-dc
-
-# Bao gồm hai bridge AHB-Lite của public top
-make synth-dc-ahb
-```
-
-Multiplier radix-2 có thanh ghi accumulator, multiplicand và multiplier nội
-bộ. Mỗi bước phải đóng timing trong một clock bình thường; flow không áp dụng
-multicycle timing exception cho datapath này. Báo cáo riêng
-`timing_multiplier.rpt` kiểm tra các đường timing bên trong multiplier.
-
-Mặc định project dùng Sky130 HD tại corner `tt, 25 C, 1.80 V` thông qua symlink
-`.tools/pdk-sky130`. Trên máy hiện tại, tạo liên kết tới PDK dùng chung bằng:
-
-```bash
-ln -s /home/shared/PDK/pdk-sky130 .tools/pdk-sky130
-```
-
-Có thể chọn corner hoặc standard-cell library khác bằng cách override:
-
-```bash
-make synth-dc \
-  SYNTH_LIBRARY=/path/to/standard_cells.db \
-  SYNTH_CLOCK_PERIOD=10.0
-```
-
-Kết quả chính nằm trong `build/synth/dc/rv32i_core/reports/`; netlist và SDC nằm
-trong `build/synth/dc/rv32i_core/netlist/`.
+`make synth-yosys` đọc đúng production file list, kiểm tra hierarchy và tổng
+hợp `rv32i_core`. Đây là synthesizability gate trong `make ci`; kết quả nằm tại
+`build/synth/yosys/rv32i_core/`. Có thể chọn top khác bằng
+`make synth-yosys SYNTH_TOP=rv32i_top`.
 
 ## FPGA
 
@@ -269,6 +227,6 @@ Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
 - [`rtl/doc/verification_report.md`](rtl/doc/verification_report.md)
 - [`rtl/doc/performance_analysis.md`](rtl/doc/performance_analysis.md)
 
-Kết quả xác minh gần nhất cho phần RV32C: RTL regression 30/30, ACT4 86/86 và
+Kết quả xác minh gần nhất cho RV32IMC: RTL regression 32/32, ACT4 90/90 và
 firmware smoke 1/1. Các báo cáo chi tiết trên vẫn ghi lại số liệu area/timing của
 phiên bản trước RV32C và cần được cập nhật sau lần synthesis kế tiếp.

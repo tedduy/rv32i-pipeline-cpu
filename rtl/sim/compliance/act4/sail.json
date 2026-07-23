@@ -270,7 +270,7 @@
   },
   "extensions": {
     "M": {
-      "supported": false
+      "supported": true
     },
     "A": {
       "supported": false
@@ -404,7 +404,7 @@
       "supported": false
     },
     "Zmmul": {
-      "supported": true
+      "supported": false
     },
     "Zaamo": {
       "supported": false

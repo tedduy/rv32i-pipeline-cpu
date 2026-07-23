@@ -12,7 +12,10 @@ module mux4to1 #(
       2'b01: o_y = i_d1;
       2'b10: o_y = i_d2;
       2'b11: o_y = i_d3;
+      // All values of the two-bit selector are enumerated above.
+      /* verilator coverage_off */
       default: o_y = '0;
+      /* verilator coverage_on */
     endcase
   end
 

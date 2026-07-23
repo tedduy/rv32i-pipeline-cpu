@@ -232,6 +232,12 @@ module tb_act;
                          first_trap_pc, first_trap_cause, first_trap_value);
                 $display("ACT4 stores: count=%0d last_addr=%08x last_data=%08x",
                          store_count, last_store_addr, last_store_data);
+                $display("ACT4 last 16 retired instructions (oldest to newest):");
+                for (integer hist_idx = 0; hist_idx < 16; hist_idx = hist_idx + 1) begin
+                    $display("  pc=%08x inst=%08x",
+                             commit_pc_history[(commit_history_index + hist_idx) & 15],
+                             commit_inst_history[(commit_history_index + hist_idx) & 15]);
+                end
                 $fatal(1, "ACT4 timeout after %0d cycles: %s", max_cycles, test_name);
             end
         end

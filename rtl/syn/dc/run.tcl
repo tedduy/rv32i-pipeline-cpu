@@ -81,17 +81,17 @@ compile_ultra -incremental -no_autoungroup
 # one-cycle constraint. Resolve the mapped registers only for dedicated timing
 # reports; no multicycle timing exception is valid for either implementation.
 set mapped_mul_launch_pins [get_pins -hierarchical -quiet \
-    -filter "full_name =~ *ex_multiplier/*_q_reg*/Q"]
+    -filter "full_name =~ *ex_mdu/u_multiplier/*_q_reg*/Q"]
 set mapped_mul_capture_pins [get_pins -hierarchical -quiet \
-    -filter "full_name =~ *ex_multiplier/*_q_reg*/D"]
+    -filter "full_name =~ *ex_mdu/u_multiplier/*_q_reg*/D"]
 set mapped_mul_capture_pins [add_to_collection $mapped_mul_capture_pins \
     [get_pins -hierarchical -quiet \
         -filter "full_name =~ *ex_mem_reg/o_alu_result_reg*/D"]]
 
 set mapped_div_launch_pins [get_pins -hierarchical -quiet \
-    -filter "full_name =~ *ex_divider/*_q_reg*/Q"]
+    -filter "full_name =~ *ex_mdu/u_divider/*_q_reg*/Q"]
 set mapped_div_capture_pins [get_pins -hierarchical -quiet \
-    -filter "full_name =~ *ex_divider/*_q_reg*/D"]
+    -filter "full_name =~ *ex_mdu/u_divider/*_q_reg*/D"]
 set mapped_div_capture_pins [add_to_collection $mapped_div_capture_pins \
     [get_pins -hierarchical -quiet \
         -filter "full_name =~ *ex_mem_reg/o_alu_result_reg*/D"]]

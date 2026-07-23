@@ -18,8 +18,6 @@ module ex_mem_register #(
     input  logic [N-1:0]     i_instruction,
     input  logic [N-1:0]     i_alu_result,
     input  logic [N-1:0]     i_rs2_data,
-    input  logic [N-1:0]     i_pc_branch_target,
-    input  logic [N-1:0]     i_jump_target,
     input  logic [N-1:0]     i_return_addr,
     input  logic [N-1:0]     i_immediate,
     input  logic [4:0]       i_rd_addr,
@@ -42,8 +40,6 @@ module ex_mem_register #(
     output logic [N-1:0]     o_instruction,
     output logic [N-1:0]     o_alu_result,
     output logic [N-1:0]     o_rs2_data,
-    output logic [N-1:0]     o_pc_branch_target,
-    output logic [N-1:0]     o_jump_target,
     output logic [N-1:0]     o_return_addr,
     output logic [N-1:0]     o_immediate,
     output logic [4:0]       o_rd_addr,
@@ -110,8 +106,6 @@ module ex_mem_register #(
             o_instruction      <= i_instruction;
             o_alu_result       <= i_alu_result;
             o_rs2_data         <= i_rs2_data;
-            o_pc_branch_target <= i_pc_branch_target;
-            o_jump_target      <= i_jump_target;
             o_return_addr      <= i_return_addr;
             o_immediate        <= i_immediate;
             o_rd_addr          <= i_rd_addr;
