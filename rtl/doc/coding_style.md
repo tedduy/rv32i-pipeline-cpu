@@ -17,8 +17,8 @@ The project uses these naming rules for new and refactored SystemVerilog:
 
 The stable integration modules are:
 
-- `rv32i_core`: native instruction/data valid-ready interfaces.
-- `rv32i_top`: separate instruction and data AHB-Lite masters.
+- `tdrv32_core`: native instruction/data valid-ready interfaces.
+- `tdrv32_top`: separate instruction and data AHB-Lite masters.
 
 Debug outputs belong to the native core and use the `o_debug_` namespace.
 Generated ASIC netlists retain the port names from the RTL revision that

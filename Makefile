@@ -5,6 +5,8 @@ SHELL := /bin/bash
 # verification flow can evolve independently without turning this into a script.
 include mk/common.mk
 include mk/tools.mk
+include mk/docker.mk
+include mk/openlane.mk
 include mk/consistency.mk
 include mk/doctor.mk
 include mk/lint.mk
@@ -18,13 +20,15 @@ include mk/firmware.mk
 .PHONY: help all ci test clean
 
 help:
-	@echo "RV32IMC open-source development flow"
+	@echo "TDRV32 open-source development flow"
 	@echo
 	@echo "Quick start"
 	@echo "  make setup               Install the default local development environment"
 	@echo "  make tools-setup         Install HDL tools, RISC-V GCC and riscv-formal"
 	@echo "  make verification-setup  Create .venv and install Cocotb"
 	@echo "  make doctor              Check required local tools"
+	@echo "  make mount               Enter the Docker development environment"
+	@echo "  make mount-openlane      Enter the OpenLane 2 ASIC environment"
 	@echo "  make test                Run Cocotb on Verilator and Icarus"
 	@echo "  make ci                  Run the complete RTL quality gate"
 	@echo

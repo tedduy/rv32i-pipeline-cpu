@@ -49,7 +49,7 @@ module tb_act;
     integer      i;
     logic [31:0] dmem_word_addr;
 
-    rv32i_core #(
+    tdrv32_core #(
         .RESET_VECTOR(32'h0000_0000)
     ) dut (
         .i_clk                 (clk),

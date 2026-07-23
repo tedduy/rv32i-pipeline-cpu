@@ -16,7 +16,7 @@ IF → ID → EX → MEM → WB
 - Iterative multiplier and divider.
 - Machine-mode CSRs, exceptions, interrupts, `MRET`, and `WFI`.
 - Separate instruction and data native buses with `valid`, `ready`, and fault signaling.
-- Dual AHB-Lite master interfaces through `rv32i_top`.
+- Dual AHB-Lite master interfaces through `tdrv32_top`.
 - Commit interface and RVFI support for formal verification.
 - Cocotb, constrained-random, coverage, formal, and ACT4 verification flows.
 - Bare-metal firmware and a DE2-115 FPGA wrapper.
@@ -91,8 +91,8 @@ scripts/                 Tool setup and utilities
 
 Recommended starting points:
 
-1. [`rv32i_core.sv`](rtl/logical/rv32i_core.sv)
-2. [`rv32i_pipeline.sv`](rtl/logical/pipeline/rv32i_pipeline.sv)
+1. [`tdrv32_core.sv`](rtl/logical/tdrv32_core.sv)
+2. [`tdrv32_pipeline.sv`](rtl/logical/pipeline/tdrv32_pipeline.sv)
 3. [`test_core.py`](verification/cocotb/test_core.py)
 
 See [`verification/README.md`](verification/README.md) for the verification

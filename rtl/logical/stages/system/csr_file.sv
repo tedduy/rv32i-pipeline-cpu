@@ -115,7 +115,7 @@ module csr_file #(
         unique case (i_csr_addr)
             CSR_MSTATUS:   o_csr_rdata = {{(N-13){1'b0}}, 2'b11, 3'b000,
                                           mstatus_mpie, 3'b000, mstatus_mie, 3'b000};
-            // mstatush exists on RV32. This little-endian RV32I core does not
+            // mstatush exists on RV32. This little-endian RV32IMC core does not
             // implement any of its optional fields, so all bits are WARL zero.
             // Writes are nevertheless legal and are ignored.
             CSR_MSTATUSH:  o_csr_rdata = '0;

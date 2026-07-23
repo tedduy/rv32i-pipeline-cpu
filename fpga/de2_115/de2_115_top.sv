@@ -1,5 +1,5 @@
 // ==============================================================================
-// DE2-115 Top-Level Module for RV32I Pipeline CPU
+// DE2-115 top-level module for TDRV32.
 // Manual Clock Control Version - Clock driven by SW[17] switch
 // ==============================================================================
 // Board: Terasic DE2-115
@@ -91,7 +91,7 @@ module de2_115_top (
     logic [31:0] debug_immediate;
     logic        debug_alu_uses_immediate;
 
-    // Native instruction/data memory interfaces used by rv32i_core.
+    // Native instruction/data memory interfaces used by tdrv32_core.
     logic        imem_valid;
     logic [31:0] imem_addr;
     logic [31:0] imem_rdata;
@@ -113,7 +113,7 @@ module de2_115_top (
     // CPU INSTANTIATION
     // ==========================================================================
     
-    rv32i_core u_core (
+    tdrv32_core u_core (
         .i_clk         (clk),
         .i_arst_n      (rst_n),
 

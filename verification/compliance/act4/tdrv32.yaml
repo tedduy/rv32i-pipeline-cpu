@@ -3,8 +3,8 @@
 $schema: config_schema.json#
 kind: architecture configuration
 type: fully configured
-name: rv32i-pipeline
-description: RV32IMC with Zicsr, Zifencei and Zicntr for the rv32i-pipeline CPU
+name: tdrv32
+description: RV32IMC with Zicsr, Zifencei and Zicntr for TDRV32
 
 # Sm supplies the machine-mode architectural context used by the core's CSR,
 # trap and interrupt implementation. Zca is the integer compressed instruction

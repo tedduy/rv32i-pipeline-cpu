@@ -1,6 +1,6 @@
 # Verification status
 
-The maintained verification flow targets the public `rv32i_core` interfaces and
+The maintained verification flow targets the public `tdrv32_core` interfaces and
 uses only open-source tools in CI.
 
 ## Acceptance gate

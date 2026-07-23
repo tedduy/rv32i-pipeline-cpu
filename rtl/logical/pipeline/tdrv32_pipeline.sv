@@ -2,7 +2,7 @@
 // RV32IMC five-stage pipeline implementation.
 // =============================================================================
 
-module rv32i_pipeline #(
+module tdrv32_pipeline #(
     parameter N = 32,
     parameter REG_DEPTH = 32,
     parameter logic [N-1:0] RESET_VECTOR = '0,

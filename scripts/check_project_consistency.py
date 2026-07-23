@@ -37,7 +37,7 @@ def check_structural_boundaries() -> None:
         r"^\s*(assign\b|always(?:_comb|_ff|_latch)?\b|"
         r"function\b|task\b|generate\b)"
     )
-    for relative in ("rtl/logical/rv32i_core.sv", "rtl/logical/rv32i_top.sv"):
+    for relative in ("rtl/logical/tdrv32_core.sv", "rtl/logical/tdrv32_top.sv"):
         path = ROOT / relative
         for number, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), start=1
@@ -47,7 +47,7 @@ def check_structural_boundaries() -> None:
 
 
 def check_fpga_manifest(production: list[Path]) -> None:
-    qsf = ROOT / "fpga/de2_115/rv32i_top.qsf"
+    qsf = ROOT / "fpga/de2_115/tdrv32_top.qsf"
     qsf_sources: set[Path] = set()
     pattern = re.compile(r"SYSTEMVERILOG_FILE\s+(\S+)")
     for line in qsf.read_text(encoding="utf-8").splitlines():
@@ -68,7 +68,7 @@ def check_fpga_manifest(production: list[Path]) -> None:
 
 def check_formal_templates() -> None:
     templates = {
-        ROOT / "verification/formal/protocol/rv32i_core_protocol.sby.in":
+        ROOT / "verification/formal/protocol/tdrv32_core_protocol.sby.in":
             "@RTL_BASENAMES@",
         ROOT / "verification/formal/riscv/checks.cfg.in":
             "@RTL_RISCV_FILES@",

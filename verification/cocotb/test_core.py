@@ -1,4 +1,4 @@
-"""Architectural and native-bus protocol tests for rv32i_core."""
+"""Architectural and native-bus protocol tests for tdrv32_core."""
 
 import os
 

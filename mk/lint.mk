@@ -11,5 +11,5 @@ lint:
 	@mkdir -p "$(LINT_REPORT_DIR)"
 	@set -o pipefail; \
 	$(VERILATOR) --lint-only --timing --Wall \
-		"$(LINT_CONFIG)" --top-module rv32i_top -f "$(RTL_FILELIST)" \
+		"$(LINT_CONFIG)" --top-module tdrv32_top -f "$(RTL_FILELIST)" \
 		2>&1 | tee "$(LINT_REPORT)"

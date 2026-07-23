@@ -1,6 +1,6 @@
 # Open-source synthesizability sanity check.
 
-SYNTH_TOP ?= rv32i_core
+SYNTH_TOP ?= tdrv32_core
 YOSYS_DIR := build/synth/yosys/$(SYNTH_TOP)
 
 .PHONY: synth-yosys

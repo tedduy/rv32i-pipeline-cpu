@@ -1,4 +1,4 @@
-name: Open-source RTL CI
+name: ci
 
 on:
   push:
@@ -11,12 +11,12 @@ permissions:
   packages: write
 
 concurrency:
-  group: rtl-ci-${{ github.workflow }}-${{ github.ref }}
+  group: tdrv32-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   ci_image:
-    name: CI image
+    name: image
     if: >
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
@@ -28,14 +28,14 @@ jobs:
     secrets: inherit
 
   image:
-    name: Select image
+    name: setup
     needs: ci_image
     if: always()
     runs-on: ubuntu-24.04
     outputs:
       image-tag: ${{ steps.image.outputs.tag }}
     steps:
-      - name: Select image
+      - name: image
         id: image
         shell: bash
         env:
@@ -50,7 +50,7 @@ jobs:
           fi
 
   lint:
-    name: Lint
+    name: lint
     needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -61,11 +61,11 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - name: Repository consistency
+      - name: consistency
         run: make consistency
-      - name: Verilator lint
+      - name: verilator
         run: make lint
-      - name: Upload static-check logs
+      - name: logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -74,7 +74,7 @@ jobs:
           if-no-files-found: ignore
 
   test:
-    name: Simulation
+    name: simulation
     needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -85,11 +85,11 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - name: Cocotb with Verilator
+      - name: verilator
         run: make cocotb-verilator
-      - name: Cocotb with Icarus
+      - name: icarus
         run: make cocotb-iverilog
-      - name: Upload simulator logs
+      - name: logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -98,7 +98,7 @@ jobs:
           if-no-files-found: ignore
 
   formal:
-    name: Formal
+    name: formal
     needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -109,25 +109,25 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - name: Protocol formal
+      - name: protocol
         run: make formal
-      - name: RISC-V formal
+      - name: isa
         run: make riscv-formal
-      - name: Upload formal logs
+      - name: logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: formal-logs
           path: |
             build/formal/
-            /opt/rv32i-tools/riscv-formal/cores/rv32i-pipeline/checks/*/status
-            /opt/rv32i-tools/riscv-formal/cores/rv32i-pipeline/checks/*/logfile.txt
-            /opt/rv32i-tools/riscv-formal/cores/rv32i-pipeline/checks/*/engine_0/trace.vcd
+            /opt/tdrv32-tools/riscv-formal/cores/tdrv32/checks/*/status
+            /opt/tdrv32-tools/riscv-formal/cores/tdrv32/checks/*/logfile.txt
+            /opt/tdrv32-tools/riscv-formal/cores/tdrv32/checks/*/engine_0/trace.vcd
           if-no-files-found: ignore
           include-hidden-files: true
 
   result:
-    name: Result
+    name: result
     if: always()
     needs:
       - ci_image
@@ -137,7 +137,7 @@ jobs:
       - formal
     runs-on: ubuntu-24.04
     steps:
-      - name: Check all required jobs
+      - name: verify
         shell: bash
         env:
           IMAGE_BUILD_RESULT: ${{ needs.ci_image.result }}

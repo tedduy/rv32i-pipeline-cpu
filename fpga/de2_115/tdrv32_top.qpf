@@ -28,4 +28,4 @@ DATE = "09:20:09  Tháng 11 18, 2025"
 
 # Revisions
 
-PROJECT_REVISION = "rv32i_top"
+PROJECT_REVISION = "tdrv32_top"

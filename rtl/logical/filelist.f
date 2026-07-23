@@ -39,11 +39,11 @@ rtl/logical/pipeline/if_id_register.sv
 rtl/logical/pipeline/id_ex_register.sv
 rtl/logical/pipeline/ex_mem_register.sv
 rtl/logical/pipeline/mem_wb_register.sv
-rtl/logical/pipeline/rv32i_pipeline.sv
+rtl/logical/pipeline/tdrv32_pipeline.sv
 
 rtl/logical/hazard/forwarding_unit.sv
 rtl/logical/hazard/hazard_detection_unit.sv
 
 rtl/logical/bus/native_to_ahb_lite.sv
-rtl/logical/rv32i_core.sv
-rtl/logical/rv32i_top.sv
+rtl/logical/tdrv32_core.sv
+rtl/logical/tdrv32_top.sv

@@ -1,4 +1,4 @@
-module rv32i_core_protocol_formal;
+module tdrv32_core_protocol_formal;
 
     (* gclk *) logic formal_timestep;
     logic i_clk = 1'b0;
@@ -36,7 +36,7 @@ module rv32i_core_protocol_formal;
     logic        o_commit_mem_write;
     logic [3:0]  o_commit_mem_wstrb;
 
-    rv32i_core dut (
+    tdrv32_core dut (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
         .i_irq_software(1'b0),

@@ -2,7 +2,7 @@
 //
 // Keep this module structural: implementation logic belongs to the pipeline
 // hierarchy so integration-facing ports remain stable as internals evolve.
-module rv32i_core #(
+module tdrv32_core #(
     parameter N = 32,
     parameter REG_DEPTH = 32,
     parameter logic [N-1:0] RESET_VECTOR = '0,
@@ -102,7 +102,7 @@ module rv32i_core #(
     output logic         o_debug_alu_uses_immediate
 );
 
-    rv32i_pipeline #(
+    tdrv32_pipeline #(
         .N(N),
         .REG_DEPTH(REG_DEPTH),
         .RESET_VECTOR(RESET_VECTOR),

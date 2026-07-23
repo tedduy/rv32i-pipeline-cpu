@@ -5,7 +5,7 @@ ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
 ACT_CONFIG := verification/compliance/act4/test_config.yaml
 ACT_WORK_DIR := build/act4
 ACT_SIMV := $(ACT_WORK_DIR)/tb_act.vvp
-ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs
+ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/tdrv32/elfs
 ACT_MAX_CYCLES ?= 1000000
 ACT_EXTENSIONS ?= I,M,Zca,Zicsr,Zifencei,Zicntr,ExceptionsZc
 ACT_EXCLUDE_EXTENSIONS ?=
@@ -74,17 +74,17 @@ act-regression: act-compile
 	@python3 scripts/run_act.py "$(ACT_ELF_DIR)" --simv "$(ACT_SIMV)" \
 		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
 
-act-zca: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zca
+act-zca: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/rv32i/Zca
 act-zca: act-regression
-act-zc-exceptions: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/priv/ExceptionsZc
+act-zc-exceptions: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/priv/ExceptionsZc
 act-zc-exceptions: act-regression
-act-zicsr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zicsr
+act-zicsr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/rv32i/Zicsr
 act-zicsr: act-regression
-act-zifencei: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zifencei
+act-zifencei: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/rv32i/Zifencei
 act-zifencei: act-regression
-act-zicntr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/Zicntr
+act-zicntr: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/rv32i/Zicntr
 act-zicntr: act-regression
-act-m: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/rv32i/M
+act-m: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/rv32i/M
 act-m: act-regression
 
 act-zc-exceptions-generate: act-tools-check
@@ -108,7 +108,7 @@ act-sm-prepare: act-tools-check
 act-sm-generate: act-sm-prepare
 	@find "$(ACT_ROOT)/tests/priv/ExceptionsSm" -maxdepth 1 -type f \
 		-name '*.S' -delete 2>/dev/null || true
-	@find "$(abspath $(ACT_WORK_DIR))/generated/rv32i-pipeline/elfs/priv/ExceptionsSm" \
+	@find "$(abspath $(ACT_WORK_DIR))/generated/tdrv32/elfs/priv/ExceptionsSm" \
 		-type f -delete 2>/dev/null || true
 	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" -B tests \
 		EXTENSIONS=ExceptionsSm EXCLUDE_EXTENSIONS=
@@ -116,5 +116,5 @@ act-sm-generate: act-sm-prepare
 	@$(ACT_ENV) $(MAKE) -C "$(ACT_ROOT)" $(ACT_GENERATE_ARGS) \
 		EXTENSIONS=ExceptionsSm EXCLUDE_EXTENSIONS=
 
-act-sm-exceptions: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs/priv/ExceptionsSm
+act-sm-exceptions: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/priv/ExceptionsSm
 act-sm-exceptions: act-regression

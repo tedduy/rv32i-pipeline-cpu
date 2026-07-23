@@ -2,10 +2,10 @@
 
 RISCV_FORMAL_REV := c992aa61fdfe0846c5ed90324c596202a1c69b76
 RISCV_FORMAL_DIR := $(TOOLS_DIR)/riscv-formal
-RISCV_FORMAL_CORE_DIR := $(RISCV_FORMAL_DIR)/cores/rv32i-pipeline
+RISCV_FORMAL_CORE_DIR := $(RISCV_FORMAL_DIR)/cores/tdrv32
 FORMAL_RENDERER := scripts/render_formal_configs.py
-PROTOCOL_FORMAL_TEMPLATE := verification/formal/protocol/rv32i_core_protocol.sby.in
-PROTOCOL_FORMAL_CONFIG := build/formal/protocol/rv32i_core_protocol.sby
+PROTOCOL_FORMAL_TEMPLATE := verification/formal/protocol/tdrv32_core_protocol.sby.in
+PROTOCOL_FORMAL_CONFIG := build/formal/protocol/tdrv32_core_protocol.sby
 RISCV_FORMAL_TEMPLATE := verification/formal/riscv/checks.cfg.in
 RISCV_FORMAL_CONFIG := $(CURDIR)/build/formal/riscv/checks.cfg
 RISCV_FORMAL_JOBS ?= 4

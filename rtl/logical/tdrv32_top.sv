@@ -1,5 +1,5 @@
 // Public CPU top-level with separate instruction and data AHB-Lite masters.
-module rv32i_top #(
+module tdrv32_top #(
     parameter N = 32,
     parameter REG_DEPTH = 32,
     parameter logic [N-1:0] RESET_VECTOR = '0,
@@ -73,7 +73,7 @@ module rv32i_top #(
         .o_core_sleep(o_core_sleep)
     );
 
-    rv32i_core #(
+    tdrv32_core #(
         .N(N),
         .REG_DEPTH(REG_DEPTH),
         .RESET_VECTOR(RESET_VECTOR),

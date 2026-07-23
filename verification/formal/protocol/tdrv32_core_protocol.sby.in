@@ -15,11 +15,11 @@ smtbmc boolector
 [script]
 read -formal -sv \
 @RTL_BASENAMES@
-    rv32i_core_protocol.sv
-prep -top rv32i_core_protocol_formal
+    tdrv32_core_protocol.sv
+prep -top tdrv32_core_protocol_formal
 async2sync
 dffunmap
 
 [files]
 @RTL_FILES@
-verification/formal/protocol/rv32i_core_protocol.sv
+verification/formal/protocol/tdrv32_core_protocol.sv

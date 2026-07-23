@@ -16,7 +16,7 @@ module rvfi_wrapper (
     wire [3:0]  dmem_wstrb;
     wire [1:0]  dmem_size;
 
-    rv32i_core dut (
+    tdrv32_core dut (
         .i_clk(clock),
         .i_arst_n(!reset),
         .i_irq_software(1'b0),

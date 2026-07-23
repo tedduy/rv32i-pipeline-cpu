@@ -1,15 +1,15 @@
 `verilator_config
 
-// rv32i_top intentionally drops the core's optional debug-only outputs. The
+// tdrv32_top intentionally drops the core's optional debug-only outputs. The
 // native read qualifier and byte strobes are redundant after conversion to AHB,
 // which derives transfers from valid/write/address/size.
-lint_off -rule PINCONNECTEMPTY -file "*rtl/logical/rv32i_top.sv" -match "Instance pin connected by name with empty reference: 'o_debug_*'*"
-lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/rv32i_top.sv" -match "Signal is not used: 'dmem_read'*"
-lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/rv32i_top.sv" -match "Signal is not used: 'dmem_wstrb'*"
+lint_off -rule PINCONNECTEMPTY -file "*rtl/logical/tdrv32_top.sv" -match "Instance pin connected by name with empty reference: 'o_debug_*'*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/tdrv32_top.sv" -match "Signal is not used: 'dmem_read'*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/tdrv32_top.sv" -match "Signal is not used: 'dmem_wstrb'*"
 
 // The decoded instruction remains a standard 32-bit payload through EX. rd is
 // carried separately, so those five encoding bits are intentionally unused.
-lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/pipeline/rv32i_pipeline.sv" -match "Bits of signal are not used: 'ex_instruction'[11:7]*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/pipeline/tdrv32_pipeline.sv" -match "Bits of signal are not used: 'ex_instruction'[11:7]*"
 
 // IALIGN=16 makes architectural instruction/trap addresses halfword aligned.
 lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/stages/fetch/rv32c_fetch_buffer.sv" -match "Bits of signal are not used: 'i_pc'[0]*"

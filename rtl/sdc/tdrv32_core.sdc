@@ -1,4 +1,4 @@
-# Shared synthesis constraints for rv32i_core and the AHB-Lite wrapper.
+# Shared synthesis constraints for tdrv32_core and the AHB-Lite wrapper.
 # The DC driver defines clock_period from SYNTH_CLOCK_PERIOD before sourcing
 # this file, which keeps the constraint policy independent from the tool flow.
 

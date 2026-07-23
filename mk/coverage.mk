@@ -2,7 +2,7 @@
 
 # Format: top-level:test-module:coverage-file-stem
 COVERAGE_SUITES := \
-	rv32i_core:test_core:core \
+	tdrv32_core:test_core:core \
 	rv32c_decompressor:test_decompressor:decompressor \
 	load_store_unit:test_load_store:load_store \
 	branch_unit:test_branch:branch \
@@ -46,7 +46,7 @@ coverage: check-cocotb
 	done
 	@PATH="$(VENV_BIN):$$PATH" $(MAKE) --no-print-directory \
 		-C "$(COCOTB_DIR)" SIM=verilator RTL_COVERAGE=1 \
-		COCOTB_TOPLEVEL=rv32i_core \
+		COCOTB_TOPLEVEL=tdrv32_core \
 		COCOTB_TEST_MODULES=test_core_high_address \
 		COVERAGE_FILE=core_high.dat \
 		SIM_BUILD="$(abspath build/cocotb/verilator-coverage-core-high)" \
