@@ -30,35 +30,36 @@ module if_id_register #(
     output logic             o_compressed
 );
 
+    // Keep the decoded instruction benign while the stage is invalid. Some
+    // decode controls feed pipeline control before the valid bit is consumed,
+    // so an uninitialized instruction could otherwise propagate X values.
     always_ff @(posedge i_clk or negedge i_arst_n) begin
         if (!i_arst_n) begin
-            // Reset: Insert NOP (ADDI x0, x0, 0)
-            o_valid       <= 1'b0;
+            o_valid        <= 1'b0;
             o_access_fault <= 1'b0;
-            o_pc          <= 32'h0;
-            o_instruction <= 32'h00000013;  // NOP
-            o_raw_instruction <= 32'h00000013;
-            o_compressed  <= 1'b0;
-        end
-        else if (i_flush) begin
-            // Flush: Insert NOP (bubble)
-            o_valid       <= 1'b0;
+            o_instruction  <= 32'h0000_0013;
+            o_compressed   <= 1'b0;
+        end else if (i_flush) begin
+            o_valid        <= 1'b0;
             o_access_fault <= 1'b0;
-            o_pc          <= 32'h0;
-            o_instruction <= 32'h00000013;  // NOP
-            o_raw_instruction <= 32'h00000013;
-            o_compressed  <= 1'b0;
-        end
-        else if (!i_stall) begin
-            // Normal operation: Pass data through
-            o_valid       <= i_valid;
+            o_instruction  <= 32'h0000_0013;
+            o_compressed   <= 1'b0;
+        end else if (!i_stall) begin
+            o_valid        <= i_valid;
             o_access_fault <= i_access_fault;
-            o_pc          <= i_pc;
-            o_instruction <= i_instruction;
-            o_raw_instruction <= i_raw_instruction;
-            o_compressed  <= i_compressed;
+            o_instruction  <= i_instruction;
+            o_compressed   <= i_compressed;
         end
-        // If stall: Keep current values (no else clause)
+    end
+
+    // PC and raw instruction are consumed only on valid exception/commit
+    // paths. Keep them off reset and flush so 64 payload flops can use the
+    // smaller non-resettable cells without adding logic to the decode path.
+    always_ff @(posedge i_clk) begin
+        if (!i_stall) begin
+            o_pc              <= i_pc;
+            o_raw_instruction <= i_raw_instruction;
+        end
     end
 
 endmodule
