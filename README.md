@@ -1,256 +1,119 @@
-# RV32IMC 5-Stage Pipeline CPU
+# TDRV32
 
-CPU RISC-V 32-bit triển khai bằng SystemVerilog, sử dụng pipeline 5 tầng:
+[![CI](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml/badge.svg)](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml)
+
+A 32-bit RISC-V CPU written in SystemVerilog with a five-stage pipeline:
 
 ```text
 IF → ID → EX → MEM → WB
 ```
 
-Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Instruction memory và data memory nằm ngoài CPU; hai giao tiếp dùng handshake `valid`/`ready` để core có thể chờ ROM, Flash, SRAM hoặc interconnect của MCU. Repo đồng thời chứa verification open-source, firmware smoke và wrapper FPGA DE2-115.
+## Features
 
-Địa chỉ khởi động được cấu hình qua tham số `RESET_VECTOR` của `rv32i_top`; giá trị mặc định là `0x0000_0000`.
+- RV32IMC with Zicsr, Zifencei, and Zicntr.
+- Data forwarding and load-use hazard detection.
+- Pipeline flushing for branches and jumps.
+- Iterative multiplier and divider.
+- Machine-mode CSRs, exceptions, interrupts, `MRET`, and `WFI`.
+- Separate instruction and data native buses with `valid`, `ready`, and fault signaling.
+- Dual AHB-Lite master interfaces through `rv32i_top`.
+- Commit interface and RVFI support for formal verification.
+- Cocotb, constrained-random, coverage, formal, and ACT4 verification flows.
+- Bare-metal firmware and a DE2-115 FPGA wrapper.
 
-Core hỗ trợ các lệnh CSR của extension Zicsr, `ECALL`, `EBREAK` và `MRET` trong
-machine mode. Các CSR hiện có gồm `mstatus`, `mie`, `mtvec`, `mscratch`, `mepc`,
-`mcause`, `mtval`, `mip`, `mcycle`, `minstret`, `misa` và nhóm machine
-identification/configuration CSR. `mhartid` cùng các ID có thể cấu hình bằng
-tham số top-level. Ba ngõ vào interrupt đồng bộ với clock hỗ trợ machine
-software, timer và external interrupt.
+## Quick Start
 
-ISA hiện tại là RV32IMC cùng `Zicsr`, `Zifencei` và `Zicntr`. Phần
-`Zca` của compressed extension được giải nén ở fetch stage; PC tiến thêm 2 hoặc
-4 byte và fetch buffer ghép được lệnh 32-bit bắt đầu tại nửa trên của một word.
-Full M cung cấp bốn phép nhân qua multiplier iterative và `DIV`, `DIVU`, `REM`,
-`REMU` qua divider restoring radix-2. Cả hai datapath thực hiện một bước mỗi
-chu kỳ và hoàn tất sau 32 chu kỳ, ưu tiên area nhỏ cho MCU hơn throughput.
-Pipeline giữ instruction ở EX cho tới khi kết quả sẵn sàng.
+Requirements: Git, Docker, and GNU Make.
 
-Illegal instruction, truy cập CSR không được hỗ trợ và địa chỉ load/store lệch
-alignment đều tạo precise exception trước khi instruction gây lỗi tạo side
-effect. Core dùng `IALIGN=16`; `mepc[1]` được giữ lại và target control-flow chỉ
-cần căn hàng theo 2 byte.
-
-## Commit/retire interface
-
-Khi một instruction hoàn tất theo đúng thứ tự chương trình, core phát một xung
-`o_commit_valid` kèm theo:
-
-- `o_commit_pc`, `o_commit_instruction`: PC và encoding gốc của lệnh đã retire;
-  lệnh compressed được zero-extend từ 16 lên 32 bit.
-- `o_commit_rd_write`, `o_commit_rd_addr`, `o_commit_rd_data`: thay đổi register kiến trúc.
-- `o_commit_mem_write`, `o_commit_mem_addr`, `o_commit_mem_wdata`, `o_commit_mem_wstrb`: side effect của store.
-
-Bubble, instruction bị flush và chu kỳ đang chờ memory không tạo commit. Interface
-này phù hợp để làm scoreboard, trace hoặc lockstep checker mà không phải đọc các
-tín hiệu debug nội bộ.
-
-Khi compile với `RISCV_FORMAL`, core còn xuất một kênh RVFI in-order đầy đủ cho
-instruction retire/trap, register, PC và memory access. Shadow path này không
-tồn tại trong production synthesis.
-
-## Bắt đầu đọc từ đâu?
-
-Đọc theo thứ tự sau để hiểu thiết kế nhanh nhất:
-
-1. [`rtl/logical/rv32i_core.sv`](rtl/logical/rv32i_core.sv) — public native-bus structural boundary.
-2. [`rtl/logical/pipeline/rv32i_pipeline.sv`](rtl/logical/pipeline/rv32i_pipeline.sv) — kết nối datapath/control và bốn ranh giới pipeline.
-3. [`rtl/logical/stages/fetch/rv32c_fetch_buffer.sv`](rtl/logical/stages/fetch/rv32c_fetch_buffer.sv) và
-   [`rtl/logical/stages/decode/rv32c_decompressor.sv`](rtl/logical/stages/decode/rv32c_decompressor.sv) — fetch và giải nén RV32C.
-4. [`rtl/logical/stages/execute/`](rtl/logical/stages/execute/) — ALU cùng multiplier/divider iterative.
-5. [`rtl/logical/hazard/`](rtl/logical/hazard/) — stall, flush và forwarding.
-6. [`verification/cocotb/test_core.py`](verification/cocotb/test_core.py) — scoreboard và kiểm thử toàn CPU qua public interface.
-
-## Cấu trúc repo
-
-```text
-rv32i-pipeline-cpu/
-├── rtl/
-│   ├── logical/              # Technology-independent synthesizable RTL
-│   │   ├── rv32i_core.sv
-│   │   ├── rv32i_top.sv
-│   │   ├── stages/           # Fetch, decode, execute, memory, system
-│   │   ├── pipeline/         # IF/ID, ID/EX, EX/MEM, MEM/WB
-│   │   ├── hazard/           # Forwarding và hazard detection
-│   │   ├── bus/              # Native-to-AHB-Lite bridge
-│   │   └── common/           # Adder và mux dùng chung
-│   ├── lint/                 # Verilator lint policy
-│   ├── sdc/                  # Timing constraints
-│   └── doc/                  # RTL và verification documents
-├── verification/
-│   ├── cocotb/               # Testbench kiến trúc và unit coverage
-│   ├── formal/
-│   │   ├── protocol/         # SymbiYosys protocol properties
-│   │   └── riscv/            # RVFI và ISA checks
-│   └── compliance/           # ACT4 profile và harness
-├── firmware/
-│   └── smoke/                # Bare-metal integration test
-├── mk/                       # Các flow được Makefile nạp
-├── fpga/
-│   └── de2_115/
-├── scripts/
-└── Makefile
+```bash
+git clone https://github.com/tedduy/TDRV32.git
+cd TDRV32
+make mount
 ```
 
-## Quy ước đặt tên
+`make mount` pulls the CI image and opens a shell at `/workspace`. All tools
+required for RTL verification are included in the container.
 
-- Quy ước đầy đủ nằm tại [`rtl/doc/coding_style.md`](rtl/doc/coding_style.md).
-- Một module SystemVerilog chính trên mỗi file.
-- Tên file trùng tên module và dùng `lower_snake_case`.
-- Testbench dùng tiền tố `tb_`.
-- Tín hiệu stage dùng tiền tố `if_`, `id_`, `ex_`, `mem_`, `wb_`.
-- `rv32i_core` là native-bus core; `rv32i_top` là public AHB-Lite wrapper.
-- FPGA wrapper có thể dùng trực tiếp `rv32i_core` với memory subsystem của board.
+```bash
+make doctor
+make lint
+make test
+make formal
+make riscv-formal
+```
 
-## Quick start cho checkout mới
-
-Flow mặc định chỉ dùng công cụ open-source:
-
-- GNU Make, Git, `curl`, `tar`, `sha256sum` và Python 3 có hỗ trợ `venv`.
-- OSS CAD Suite: Verilator, Icarus Verilog, Yosys, SymbiYosys và Boolector.
-- Cocotb được cài riêng vào `.venv` để tương thích với Python của hệ thống.
-
-Bootstrap hỗ trợ host Linux x86-64. Tất cả binary được pin version, kiểm tra
-SHA-256 và cài vào `.tools/`; Python/Cocotb nằm trong `.venv/`. Hai thư mục
-này là local artifact và không được commit:
+To work without Docker:
 
 ```bash
 make setup
 make doctor
-make ci
+make test
 ```
 
-Make tự ưu tiên `.tools/oss-cad-suite`, nên không cần `source environment`
-trước mỗi lệnh. Có thể cài từng phần bằng `make oss-cad-setup`,
-`make riscv-toolchain-setup`, `make riscv-formal-setup` hoặc chỉ tạo Python
-environment bằng `make verification-setup`.
-
-Các lệnh thường dùng:
+## Common Commands
 
 ```bash
-make test       # Cocotb trên cả Verilator và Icarus
-make lint       # Dùng setup và ghi report trong rtl/lint/
-make consistency # Kiểm structural boundary và source manifests
-make coverage   # Code-coverage ratchet + functional bins 100%
-make riscv-formal # RVFI ISA/trap/register/PC checks
-make ci         # Lint + test + random + coverage + synthesis + formal
-make clean      # Xóa toàn bộ artifact trong build/
+make help                # List all targets
+make lint                # Run Verilator lint
+make test                # Run Cocotb with Verilator and Icarus
+make random-regression   # Run constrained-random tests
+make coverage            # Measure code and functional coverage
+make formal              # Prove protocol properties
+make riscv-formal        # Run RVFI ISA checks
+make synth-yosys         # Run a synthesis sanity check
+make firmware-run        # Run the bare-metal smoke test
+make ci                  # Run the complete local quality gate
 ```
 
-`make help` là mục lục các flow. Chi tiết verification nằm trong
-[`verification/README.md`](verification/README.md). GitHub CI chia verification
-thành các khối lint, simulation và formal chạy song song bằng cùng Docker image.
-`make ci` local còn chạy thêm random regression, coverage và synthesis sanity
-check.
+## OpenLane
 
-## Docker CI image
-
-`Dockerfile.ci` đóng gói OSS CAD Suite, Cocotb và riscv-formal vào một image
-Linux x86-64. Source không nằm cố định trong image khi chạy; checkout hiện tại
-được mount tại `/workspace`:
+Enter the OpenLane 2 environment:
 
 ```bash
-docker build -f Dockerfile.ci -t rv32i-pipeline-cpu:ci .
-docker run --rm -v "$PWD:/workspace" rv32i-pipeline-cpu:ci make doctor
-docker run --rm -v "$PWD:/workspace" rv32i-pipeline-cpu:ci make ci
+make mount-openlane
 ```
 
-GitHub Actions publish image thành
-`ghcr.io/tedduy/rv32i-pipeline-cpu:ci-main`. PR nội bộ dùng tag riêng
-`ci-pr-<number>`, còn PR từ fork dùng image `ci-main` vì token của fork không
-có quyền ghi package. Package cần được đặt public để contributor bên ngoài có
-thể pull mà không cần quyền trong repository.
+The repository is mounted at `/workspace`. PDK data is persisted in the
+`tdrv32-openlane-pdk` Docker volume.
 
-RISC-V GCC và ACT4 là dependency tùy chọn, không cần để chạy `make ci`. GCC
-được cài độc lập bằng `make riscv-toolchain-setup` cho firmware smoke; toàn bộ
-ACT4 chỉ cần cho architectural compliance và được kiểm tra riêng bằng
-`make act-tools-check`.
+## Repository Layout
 
-## Architectural compliance (ACT4)
-
-Thư mục [`verification/compliance/act4/`](verification/compliance/act4/) chứa cấu hình cho flow ACT4 chính
-thức. Profile hiện tại kiểm tra `I`, `M`, `Zca`, `Zicsr`, `Zifencei` và
-`Zicntr`; machine-mode `Sm` cung cấp architectural context. `ExceptionsSm` được
-điều chỉnh cho `IALIGN=16`, còn `ExceptionsZc` kiểm tra illegal compressed
-encoding và `C.EBREAK`.
-
-Môi trường local nằm trong `.tools/act4/` và không được đưa vào Git. Nó không
-sửa `PATH`, `.bashrc` hay package hệ thống. Kiểm tra installation bằng:
-
-```bash
-make act-tools-check
-
-# Sinh các self-checking ELF chính thức vào build/act4/generated/
-make act-generate
-
-# Chạy một ELF
-make act-run ELF=/path/to/test.elf
-
-# Chạy toàn bộ ELF vừa sinh
-make act-regression
-
-# Chỉ chạy 26 ELF compressed-integer
-make act-zca
-
-# Sinh và chạy compressed exception suite
-make act-zc-exceptions-generate
-make act-zc-exceptions
-
-# Chỉ chạy sáu ELF Zicsr
-make act-zicsr
-
-# Chạy tám ELF multiply/divide của full M
-make act-m
+```text
+rtl/logical/              Synthesizable RTL
+verification/cocotb/     Cocotb testbench
+verification/formal/     Protocol and riscv-formal checks
+verification/compliance/ ACT4 configuration
+firmware/smoke/          Bare-metal firmware
+fpga/de2_115/            DE2-115 Quartus project
+mk/                      Make targets
+scripts/                 Tool setup and utilities
 ```
 
-Có thể override `ACT_ROOT`, `ACT_TOOL_ROOT` hoặc `ACT_ELF_DIR` nếu muốn dùng
-một installation khác.
+Recommended starting points:
 
-`verification/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
-`0x1000_0000` và thanh ghi pass/fail tại `0x2000_0000`. Script Python đọc trực
-tiếp các segment ELF32 little-endian nên bước chạy DUT không phụ thuộc `objcopy`.
+1. [`rv32i_core.sv`](rtl/logical/rv32i_core.sv)
+2. [`rv32i_pipeline.sv`](rtl/logical/pipeline/rv32i_pipeline.sv)
+3. [`test_core.py`](verification/cocotb/test_core.py)
 
-## Bare-metal C firmware
+See [`verification/README.md`](verification/README.md) for the verification
+plan and coverage policy.
 
-`firmware/smoke/` chứa startup assembly, linker script và chương trình C
-freestanding được biên dịch cho `rv32imc_zicsr_zifencei` và link tại reset
-vector `0x0000_0000`. Firmware khởi tạo stack,
-xóa `.bss`, cài `mtvec`, kiểm tra tám lệnh M, đọc `cycle`/`instret`, thực thi
-`FENCE.I` và in kết quả qua UART mô phỏng tại `0x1000_0000`.
+## Upstream Projects
 
-Flow dùng GCC độc lập trong `.tools/riscv-toolchain/`, không sửa cấu hình shell
-hoặc cài toolchain vào hệ thống:
+This project uses and builds upon the following open-source projects:
 
-```bash
-# Tạo ELF, map và disassembly trong build/firmware/smoke/
-make firmware-build
+- [RISC-V ISA Manual](https://github.com/riscv/riscv-isa-manual)
+- [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build)
+- [Verilator](https://github.com/verilator/verilator)
+- [Icarus Verilog](https://github.com/steveicarus/iverilog)
+- [Yosys](https://github.com/YosysHQ/yosys)
+- [SymbiYosys](https://github.com/YosysHQ/sby)
+- [Boolector](https://github.com/Boolector/boolector)
+- [Cocotb](https://github.com/cocotb/cocotb)
+- [riscv-formal](https://github.com/YosysHQ/riscv-formal)
+- [RISC-V Architectural Tests](https://github.com/riscv-non-isa/riscv-arch-test)
+- [OpenLane 2](https://github.com/efabless/openlane2)
 
-# Chạy ELF qua native memory model bằng Cocotb + Verilator
-make firmware-run
-```
+## License
 
-Firmware báo pass bằng cách ghi giá trị `1` tới thanh ghi trạng thái mô phỏng
-tại `0x2000_0000`. Exception hoặc interrupt ngoài dự kiến đi vào `trap_entry`
-và báo fail. Flow firmware không compile hoặc phụ thuộc ACT4 testbench.
-
-## Synthesis sanity check
-
-`make synth-yosys` đọc đúng production file list, kiểm tra hierarchy và tổng
-hợp `rv32i_core`. Đây là synthesizability gate trong `make ci`; kết quả nằm tại
-`build/synth/yosys/rv32i_core/`. Có thể chọn top khác bằng
-`make synth-yosys SYNTH_TOP=rv32i_top`.
-
-## FPGA
-
-Wrapper và Quartus project DE2-115 nằm tại [`fpga/de2_115/`](fpga/de2_115/).
-Các số liệu timing/resource chỉ được công bố cùng report tái tạo được cho đúng
-commit RTL; repo hiện không giữ số liệu synthesis cũ.
-
-Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
-
-## Tài liệu kết quả
-
-- [`rtl/doc/verification_report.md`](rtl/doc/verification_report.md)
-- [`rtl/doc/performance_analysis.md`](rtl/doc/performance_analysis.md)
-
-Hai tài liệu này mô tả acceptance gate và phương pháp đo hiện hành; kết quả
-machine-readable của mỗi lần chạy nằm dưới `build/` và không được commit.
+TDRV32 is licensed under the [Apache License 2.0](LICENSE).
