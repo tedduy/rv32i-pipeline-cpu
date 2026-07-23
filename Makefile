@@ -4,6 +4,7 @@ SHELL := /bin/bash
 # Keep this file as the public entry point. Implementation lives in mk/ so each
 # verification flow can evolve independently without turning this into a script.
 include mk/common.mk
+include mk/tools.mk
 include mk/consistency.mk
 include mk/doctor.mk
 include mk/lint.mk
@@ -20,6 +21,8 @@ help:
 	@echo "RV32IMC open-source development flow"
 	@echo
 	@echo "Quick start"
+	@echo "  make setup               Install the default local development environment"
+	@echo "  make tools-setup         Install HDL tools, RISC-V GCC and riscv-formal"
 	@echo "  make verification-setup  Create .venv and install Cocotb"
 	@echo "  make doctor              Check required local tools"
 	@echo "  make test                Run Cocotb on Verilator and Icarus"
@@ -44,7 +47,7 @@ help:
 	@echo
 	@echo "Firmware"
 	@echo "  make firmware-build      Build the bare-metal smoke test"
-	@echo "  make firmware-run        Build and simulate the smoke test"
+	@echo "  make firmware-run        Run the smoke ELF with Cocotb + Verilator"
 	@echo
 	@echo "Maintenance"
 	@echo "  make clean               Remove generated build artifacts"

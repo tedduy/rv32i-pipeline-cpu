@@ -61,8 +61,8 @@ Formal-tool configs are rendered from the checked-in templates into
 ## Commands
 
 ```sh
-make verification-setup
-source .tools/oss-cad-suite/environment
+make setup
+make doctor
 make lint
 make cocotb-verilator
 make cocotb-iverilog

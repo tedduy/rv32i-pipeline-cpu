@@ -105,27 +105,24 @@ rv32i-pipeline-cpu/
 
 Flow mặc định chỉ dùng công cụ open-source:
 
-- GNU Make, `curl`, `tar` và Python 3 có hỗ trợ `venv`.
+- GNU Make, Git, `curl`, `tar`, `sha256sum` và Python 3 có hỗ trợ `venv`.
 - OSS CAD Suite: Verilator, Icarus Verilog, Yosys, SymbiYosys và Boolector.
 - Cocotb được cài riêng vào `.venv` để tương thích với Python của hệ thống.
 
-Cài OSS CAD Suite vào repo (Linux x64):
+Bootstrap hỗ trợ host Linux x86-64. Tất cả binary được pin version, kiểm tra
+SHA-256 và cài vào `.tools/`; Python/Cocotb nằm trong `.venv/`. Hai thư mục
+này là local artifact và không được commit:
 
 ```bash
-mkdir -p .tools
-curl -L --fail --retry 3 \
-  -o /tmp/oss-cad-suite.tgz \
-  https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-05-08/oss-cad-suite-linux-x64-20260508.tgz
-tar -xzf /tmp/oss-cad-suite.tgz -C .tools
-```
-
-Mỗi terminal mới cần kích hoạt toolchain, sau đó tạo môi trường Python:
-
-```bash
-source .tools/oss-cad-suite/environment
-make verification-setup
+make setup
 make doctor
+make ci
 ```
+
+Make tự ưu tiên `.tools/oss-cad-suite`, nên không cần `source environment`
+trước mỗi lệnh. Có thể cài từng phần bằng `make oss-cad-setup`,
+`make riscv-toolchain-setup`, `make riscv-formal-setup` hoặc chỉ tạo Python
+environment bằng `make verification-setup`.
 
 Các lệnh thường dùng:
 
@@ -143,9 +140,10 @@ make clean      # Xóa toàn bộ artifact trong build/
 [`verification/README.md`](verification/README.md). CI GitHub chạy cùng lệnh
 `make ci`, nên kết quả local và pull request dùng chung một quality gate.
 
-ACT4 và RISC-V GCC là dependency tùy chọn, không cần để chạy `make ci`. Chúng
-chỉ cần cho architectural compliance và firmware smoke test; kiểm tra môi
-trường riêng bằng `make act-tools-check`.
+RISC-V GCC và ACT4 là dependency tùy chọn, không cần để chạy `make ci`. GCC
+được cài độc lập bằng `make riscv-toolchain-setup` cho firmware smoke; toàn bộ
+ACT4 chỉ cần cho architectural compliance và được kiểm tra riêng bằng
+`make act-tools-check`.
 
 ## Architectural compliance (ACT4)
 
@@ -199,20 +197,20 @@ vector `0x0000_0000`. Firmware khởi tạo stack,
 xóa `.bss`, cài `mtvec`, kiểm tra tám lệnh M, đọc `cycle`/`instret`, thực thi
 `FENCE.I` và in kết quả qua UART mô phỏng tại `0x1000_0000`.
 
-Flow dùng GCC nằm trong `.tools/act4/toolchain/`, không sửa `PATH` hoặc cài
-toolchain vào hệ thống:
+Flow dùng GCC độc lập trong `.tools/riscv-toolchain/`, không sửa cấu hình shell
+hoặc cài toolchain vào hệ thống:
 
 ```bash
 # Tạo ELF, map và disassembly trong build/firmware/smoke/
 make firmware-build
 
-# Compile ELF harness bằng Icarus rồi chạy firmware
+# Chạy ELF qua native memory model bằng Cocotb + Verilator
 make firmware-run
 ```
 
 Firmware báo pass bằng cách ghi giá trị `1` tới thanh ghi trạng thái mô phỏng
 tại `0x2000_0000`. Exception hoặc interrupt ngoài dự kiến đi vào `trap_entry`
-và báo fail.
+và báo fail. Flow firmware không compile hoặc phụ thuộc ACT4 testbench.
 
 ## Synthesis sanity check
 

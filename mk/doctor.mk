@@ -35,6 +35,14 @@ doctor:
 		missing=1; \
 	fi; \
 	echo; \
+	echo "Optional firmware toolchain"; \
+	if test -x "$(RISCV_TOOLCHAIN_DIR)/bin/riscv32-none-elf-gcc"; then \
+		echo "  [ok]      RISC-V GCC"; \
+	else \
+		echo "  [optional] RISC-V GCC is not installed"; \
+		echo "             Run: make riscv-toolchain-setup"; \
+	fi; \
+	echo; \
 	echo "Optional ACT4 tools"; \
 	if test -x "$(ACT_TOOL_ROOT)/bin/mise" && \
 	   test -x "$(ACT_TOOL_ROOT)/toolchain/bin/riscv32-none-elf-gcc" && \

@@ -94,15 +94,42 @@ def check_removed_legacy_paths() -> None:
             fail(f"legacy path still exists: {relative}")
 
 
+def check_portable_paths() -> None:
+    ignored_parts = {".git", ".tools", ".venv", "build", "__pycache__"}
+    checked_suffixes = {
+        ".cfg", ".f", ".json", ".md", ".mk", ".py", ".qsf", ".sh",
+        ".sv", ".tcl", ".vlt", ".yaml", ".yml",
+    }
+    absolute_user_path = re.compile(r"(?<![A-Za-z0-9])/(?:home|Users)/")
+
+    for path in ROOT.rglob("*"):
+        if (
+            not path.is_file()
+            or any(part in ignored_parts for part in path.relative_to(ROOT).parts)
+            or path.suffix not in checked_suffixes
+        ):
+            continue
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1
+        ):
+            if absolute_user_path.search(line):
+                fail(
+                    f"{path.relative_to(ROOT)}:{number} contains a "
+                    "machine-specific absolute path"
+                )
+
+
 def main() -> int:
     production = rtl_sources()
     check_structural_boundaries()
     check_fpga_manifest(production)
     check_formal_templates()
     check_removed_legacy_paths()
+    check_portable_paths()
     print(
         "Consistency: PASS "
-        f"({len(production)} production RTL sources, structural top/core)"
+        f"({len(production)} production RTL sources, structural top/core, "
+        "portable paths)"
     )
     return 0
 

@@ -1,7 +1,7 @@
 """Reusable native instruction/data memory model for the RV32 core."""
 
 from dataclasses import dataclass
-from typing import Optional, Set
+from typing import Callable, Optional, Set
 
 from cocotb.triggers import FallingEdge, RisingEdge
 
@@ -28,6 +28,7 @@ class NativeMemory:
         data_wait: int = 0,
         instruction_error_addresses: Optional[Set[int]] = None,
         data_error_addresses: Optional[Set[int]] = None,
+        mmio_write: Optional[Callable[[DataRequest], bool]] = None,
     ) -> None:
         self.dut = dut
         self.data = bytearray(size)
@@ -35,6 +36,7 @@ class NativeMemory:
         self.data_wait = data_wait
         self.instruction_error_addresses = instruction_error_addresses or set()
         self.data_error_addresses = data_error_addresses or set()
+        self.mmio_write = mmio_write
 
         self.instruction_accepts: list[int] = []
         self.data_accepts: list[DataRequest] = []
@@ -60,8 +62,19 @@ class NativeMemory:
             base = address + 2 * index
             self.data[base : base + 2] = int(halfword).to_bytes(2, "little")
 
+    def load_bytes(self, data: bytes, address: int = 0) -> None:
+        end = address + len(data)
+        if address < 0 or end > len(self.data):
+            raise ValueError(
+                f"image range 0x{address:x}..0x{end:x} exceeds "
+                f"{len(self.data)}-byte memory"
+            )
+        self.data[address:end] = data
+
     def read_word(self, address: int) -> int:
         base = address & ~0x3
+        if base < 0 or base + 4 > len(self.data):
+            return 0
         return int.from_bytes(self.data[base : base + 4], "little")
 
     def _sample_data_request(self) -> DataRequest:
@@ -75,7 +88,15 @@ class NativeMemory:
         )
 
     def _write(self, request: DataRequest) -> None:
+        if self.mmio_write is not None and self.mmio_write(request):
+            self.store_count += 1
+            return
+
         base = request.address & ~0x3
+        if base < 0 or base + 4 > len(self.data):
+            raise AssertionError(
+                f"write to unmapped address 0x{request.address:08x}"
+            )
         for lane in range(4):
             if request.write_strobes & (1 << lane):
                 self.data[base + lane] = (request.write_data >> (8 * lane)) & 0xFF

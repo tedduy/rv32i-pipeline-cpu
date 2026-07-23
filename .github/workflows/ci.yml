@@ -13,9 +13,6 @@ concurrency:
   group: rtl-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  OSS_CAD_SUITE_DATE: "20260508"
-
 jobs:
   rtl:
     name: Open-source verification gate
@@ -31,26 +28,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-${{ env.OSS_CAD_SUITE_DATE }}
+          key: oss-cad-suite-linux-x64-${{ hashFiles('scripts/setup_tools.sh') }}
 
       - name: Install OSS CAD Suite
         if: steps.oss-cad-cache.outputs.cache-hit != 'true'
         shell: bash
-        run: |
-          mkdir -p .tools
-          curl -L --fail --retry 3 \
-            -o /tmp/oss-cad-suite.tgz \
-            "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${OSS_CAD_SUITE_DATE:0:4}-${OSS_CAD_SUITE_DATE:4:2}-${OSS_CAD_SUITE_DATE:6:2}/oss-cad-suite-linux-x64-${OSS_CAD_SUITE_DATE}.tgz"
-          tar -xzf /tmp/oss-cad-suite.tgz -C .tools
+        run: make oss-cad-setup
 
       - name: Show tool versions
         shell: bash
-        run: |
-          source .tools/oss-cad-suite/environment
-          iverilog -V | head -n 2
-          verilator --version
-          yosys -V
-          sby --version
+        run: make tools-versions
 
       - name: Install verification dependencies
         shell: bash
@@ -58,9 +45,7 @@ jobs:
 
       - name: Run complete RTL gate
         shell: bash
-        run: |
-          source .tools/oss-cad-suite/environment
-          make ci
+        run: make ci
 
       - name: Upload failure logs
         if: failure()

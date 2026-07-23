@@ -3,6 +3,7 @@ SIM ?= verilator
 REPO_ROOT := $(abspath ../..)
 RTL_FILELIST := $(REPO_ROOT)/rtl/logical/filelist.f
 RTL_SOURCES := $(addprefix $(REPO_ROOT)/,$(filter %.sv,$(shell grep -v '^+' $(RTL_FILELIST))))
+export PYTHONPATH := $(REPO_ROOT)/scripts:$(PYTHONPATH)
 
 TOPLEVEL_LANG := verilog
 VERILOG_SOURCES := $(RTL_SOURCES)

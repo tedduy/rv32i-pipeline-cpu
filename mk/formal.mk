@@ -1,7 +1,7 @@
 # Protocol properties and RVFI ISA checks.
 
 RISCV_FORMAL_REV := c992aa61fdfe0846c5ed90324c596202a1c69b76
-RISCV_FORMAL_DIR := $(CURDIR)/.tools/riscv-formal
+RISCV_FORMAL_DIR := $(TOOLS_DIR)/riscv-formal
 RISCV_FORMAL_CORE_DIR := $(RISCV_FORMAL_DIR)/cores/rv32i-pipeline
 FORMAL_RENDERER := scripts/render_formal_configs.py
 PROTOCOL_FORMAL_TEMPLATE := verification/formal/protocol/rv32i_core_protocol.sby.in
