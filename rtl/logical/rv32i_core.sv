@@ -713,7 +713,7 @@ module rv32i_core #(
         .o_zero_flag(ex_alu_zero)
     );
     
-    // Branch target calculation
+    // Shared PC-relative target calculation for branches and JAL.
     adder_n_bit #(.N(N)) u_ex_branch_adder (
         .i_a  (ex_pc),
         .i_b  (ex_immediate),
@@ -734,6 +734,7 @@ module rv32i_core #(
         .i_pc(ex_pc),
         .i_rs1_data(ex_alu_operand_a_forwarded),
         .i_immediate(ex_immediate),
+        .i_pc_relative_target(ex_pc_branch_target),
         .i_jal(ex_jal),
         .i_jalr(ex_jalr),
         .i_compressed(ex_compressed),

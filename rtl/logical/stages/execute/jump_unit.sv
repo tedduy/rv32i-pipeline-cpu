@@ -4,6 +4,7 @@ module jump_unit #(
   input  logic [N-1:0] i_pc,            // Current PC
   input  logic [N-1:0] i_rs1_data,      // Register rs1 (for JALR)
   input  logic [N-1:0] i_immediate,     // Jump offset
+  input  logic [N-1:0] i_pc_relative_target, // Shared PC + immediate result
   input  logic         i_jal,           // JAL instruction
   input  logic         i_jalr,          // JALR instruction
   input  logic         i_compressed,    // Original instruction was 16 bits
@@ -18,8 +19,8 @@ module jump_unit #(
     o_return_addr = i_pc + (i_compressed ? 32'd2 : 32'd4);
     
     if (i_jal) begin
-      // JAL: target = PC + immediate
-      o_jump_target = i_pc + i_immediate;
+      // Branch and JAL use the same PC-relative adder in the core.
+      o_jump_target = i_pc_relative_target;
     end else if (i_jalr) begin
       // JALR: target = (rs1 + immediate) & ~1
       o_jump_target = (i_rs1_data + i_immediate) & ~32'd1;
