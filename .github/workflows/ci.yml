@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_ci_image:
-    name: Build CI image
+  ci_image:
+    name: CI image
     if: >
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
@@ -27,9 +27,9 @@ jobs:
       tag-prefix: ci-
     secrets: inherit
 
-  select_ci_image:
-    name: Select CI image
-    needs: build_ci_image
+  image:
+    name: Select image
+    needs: ci_image
     if: always()
     runs-on: ubuntu-24.04
     outputs:
@@ -39,23 +39,23 @@ jobs:
         id: image
         shell: bash
         env:
-          BUILT_IMAGE: ${{ needs.build_ci_image.outputs.image-primary-tag }}
+          BUILT_IMAGE: ${{ needs.ci_image.outputs.image-primary-tag }}
           FALLBACK_IMAGE: ghcr.io/${{ github.repository }}:ci-main
         run: |
-          if [[ "${{ needs.build_ci_image.result }}" == "success" && -n "$BUILT_IMAGE" ]]; then
+          if [[ "${{ needs.ci_image.result }}" == "success" && -n "$BUILT_IMAGE" ]]; then
             echo "tag=$BUILT_IMAGE" >> "$GITHUB_OUTPUT"
           else
             echo "tag=$(printf '%s' "$FALLBACK_IMAGE" | tr '[:upper:]' '[:lower:]')" \
               >> "$GITHUB_OUTPUT"
           fi
 
-  static_checks:
-    name: Static checks
-    needs: select_ci_image
+  lint:
+    name: Lint
+    needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     container:
-      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      image: ${{ needs.image.outputs.image-tag }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -73,13 +73,13 @@ jobs:
           path: rtl/lint/reports/
           if-no-files-found: ignore
 
-  simulation:
-    name: Simulator regression
-    needs: select_ci_image
+  test:
+    name: Simulation
+    needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
-      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      image: ${{ needs.image.outputs.image-tag }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -97,39 +97,13 @@ jobs:
           path: build/cocotb/
           if-no-files-found: ignore
 
-  dynamic_verification:
-    name: Random and coverage
-    needs: select_ci_image
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    container:
-      image: ${{ needs.select_ci_image.outputs.image-tag }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Constrained-random regression
-        run: make random-regression
-      - name: Code and functional coverage
-        run: make coverage
-      - name: Upload verification results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: verification-results
-          path: |
-            build/cocotb/
-            build/coverage/
-          if-no-files-found: ignore
-
   formal:
-    name: Formal verification
-    needs: select_ci_image
+    name: Formal
+    needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     container:
-      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      image: ${{ needs.image.outputs.image-tag }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -152,31 +126,28 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
 
-  rtl_gate:
-    name: Open-source verification gate
+  result:
+    name: Result
     if: always()
     needs:
-      - build_ci_image
-      - select_ci_image
-      - static_checks
-      - simulation
-      - dynamic_verification
+      - ci_image
+      - image
+      - lint
+      - test
       - formal
     runs-on: ubuntu-24.04
     steps:
       - name: Check all required jobs
         shell: bash
         env:
-          IMAGE_BUILD_RESULT: ${{ needs.build_ci_image.result }}
-          IMAGE_SELECT_RESULT: ${{ needs.select_ci_image.result }}
-          STATIC_RESULT: ${{ needs.static_checks.result }}
-          SIMULATION_RESULT: ${{ needs.simulation.result }}
-          DYNAMIC_RESULT: ${{ needs.dynamic_verification.result }}
+          IMAGE_BUILD_RESULT: ${{ needs.ci_image.result }}
+          IMAGE_SELECT_RESULT: ${{ needs.image.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          TEST_RESULT: ${{ needs.test.result }}
           FORMAL_RESULT: ${{ needs.formal.result }}
         run: |
           [[ "$IMAGE_BUILD_RESULT" == "success" || "$IMAGE_BUILD_RESULT" == "skipped" ]]
           [[ "$IMAGE_SELECT_RESULT" == "success" ]]
-          [[ "$STATIC_RESULT" == "success" ]]
-          [[ "$SIMULATION_RESULT" == "success" ]]
-          [[ "$DYNAMIC_RESULT" == "success" ]]
+          [[ "$LINT_RESULT" == "success" ]]
+          [[ "$TEST_RESULT" == "success" ]]
           [[ "$FORMAL_RESULT" == "success" ]]

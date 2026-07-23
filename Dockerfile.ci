@@ -2,6 +2,7 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TOOLS_DIR=/opt/rv32i-tools
+ENV OSS_CAD_SUITE_ROOT=/opt/rv32i-tools/oss-cad-suite
 ENV VENV=/opt/rv32i-venv
 ENV PATH="/opt/rv32i-venv/bin:/opt/rv32i-tools/oss-cad-suite/bin:${PATH}"
 
