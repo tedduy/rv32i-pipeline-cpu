@@ -4,8 +4,13 @@ SHELL := /bin/bash
 # Keep this file as the public entry point. Implementation lives in mk/ so each
 # verification flow can evolve independently without turning this into a script.
 include mk/common.mk
+include mk/consistency.mk
 include mk/doctor.mk
-include mk/verification.mk
+include mk/lint.mk
+include mk/simulation.mk
+include mk/coverage.mk
+include mk/formal.mk
+include mk/synthesis.mk
 include mk/compliance.mk
 include mk/firmware.mk
 
@@ -21,11 +26,12 @@ help:
 	@echo "  make ci                  Run the complete RTL quality gate"
 	@echo
 	@echo "RTL quality"
+	@echo "  make consistency         Repository ownership and manifest checks"
 	@echo "  make lint                Verilator lint"
 	@echo "  make random-regression   Constrained-random test seeds"
 	@echo "  make coverage            Gate code metrics + 100% functional bins"
 	@echo "  make formal              SymbiYosys protocol proofs"
-	@echo "  make riscv-formal        Bounded RV32IMC ISA + consistency checks"
+	@echo "  make riscv-formal        Representative RV32I/RV32C + consistency checks"
 	@echo "  make riscv-formal-all    Run every generated RV32IMC instruction check"
 	@echo "  make synth-yosys         Yosys synthesis sanity check"
 	@echo
@@ -45,11 +51,9 @@ help:
 
 test: cocotb-verilator cocotb-iverilog
 
-ci: lint test random-regression coverage synth-yosys formal riscv-formal
+ci: consistency lint test random-regression coverage synth-yosys formal riscv-formal
 all: ci
 
 clean:
 	@rm -rf build
 	@rm -rf rtl/lint/reports
-	@rm -rf verification/formal/rv32i_core_protocol_bmc
-	@rm -rf verification/formal/rv32i_core_protocol_cover

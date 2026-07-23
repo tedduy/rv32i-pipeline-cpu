@@ -5,7 +5,7 @@ FW_CC := $(RISCV_PREFIX)gcc
 FW_OBJDUMP := $(RISCV_PREFIX)objdump
 FW_SIZE := $(RISCV_PREFIX)size
 
-FW_DIR := rtl/sim/firmware/smoke
+FW_DIR := firmware/smoke
 FW_BUILD_DIR := build/firmware/smoke
 FW_ELF := $(FW_BUILD_DIR)/smoke.elf
 FW_ARCH ?= rv32imc_zicsr_zifencei

@@ -71,7 +71,7 @@ jobs:
             build/coverage/
             build/cocotb/
             build/synth/yosys/
-            verification/formal/rv32i_core_protocol_*/
+            build/formal/
             .tools/riscv-formal/cores/rv32i-pipeline/checks/*/status
             .tools/riscv-formal/cores/rv32i-pipeline/checks/*/logfile.txt
             .tools/riscv-formal/cores/rv32i-pipeline/checks/*/engine_0/trace.vcd

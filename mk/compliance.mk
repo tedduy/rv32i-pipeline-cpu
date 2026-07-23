@@ -2,7 +2,7 @@
 
 ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
-ACT_CONFIG := rtl/sim/compliance/act4/test_config.yaml
+ACT_CONFIG := verification/compliance/act4/test_config.yaml
 ACT_WORK_DIR := build/act4
 ACT_SIMV := $(ACT_WORK_DIR)/tb_act.vvp
 ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/rv32i-pipeline/elfs
@@ -11,8 +11,8 @@ ACT_EXTENSIONS ?= I,M,Zca,Zicsr,Zifencei,Zicntr,ExceptionsZc
 ACT_EXCLUDE_EXTENSIONS ?=
 
 ACT_SM_PATCHES := \
-	rtl/sim/compliance/act4/patches/0001-split-exceptions-sm.patch \
-	rtl/sim/compliance/act4/patches/0002-fix-ialign32-trap-resume.patch
+	verification/compliance/act4/patches/0001-split-exceptions-sm.patch \
+	verification/compliance/act4/patches/0002-fix-ialign32-trap-resume.patch
 
 ACT_ENV := env \
 	PATH="$(ACT_TOOL_ROOT)/bin:$(ACT_TOOL_ROOT)/toolchain/bin:$(ACT_TOOL_ROOT)/sail/bin:$$PATH" \
@@ -61,7 +61,7 @@ act-compile:
 	@$(call require_tool,$(IVERILOG))
 	@mkdir -p "$(ACT_WORK_DIR)"
 	@$(IVERILOG) -g2012 -Wall -Wimplicit -Wno-timescale -s tb_act \
-		-o "$(ACT_SIMV)" -f "$(RTL_FILELIST)" rtl/sim/compliance/tb_act.sv
+		-o "$(ACT_SIMV)" -f "$(RTL_FILELIST)" verification/compliance/tb_act.sv
 
 act-run: act-compile
 	@test -n "$(ELF)" || { \

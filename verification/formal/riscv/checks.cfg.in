@@ -1,0 +1,32 @@
+[options]
+isa rv32imc
+nret 1
+solver boolector
+
+[depth]
+insn 12
+insn_(mul|mulh|mulhsu|mulhu|div|divu|rem|remu) 45
+reg  1 12
+pc_fwd 1 12
+pc_bwd 1 12
+ill 12
+
+# Keep the default CI job bounded while sampling RV32I and RV32C behavior.
+# Iterative M-extension proofs need a much deeper bound and remain part of
+# `riscv-formal-all`.
+# `make riscv-formal-all` removes this filter and generates every RV32IMC
+# instruction check for exhaustive local runs.
+[filter-checks]
++ insn_(add|addi|sub|srai|beq|jal|jalr|lw|sw|c_add|c_j|c_lw|c_sw)_ch0
++ (reg|pc_fwd|pc_bwd|ill)_ch0
+- .*
+
+[defines]
+`define RISCV_FORMAL_ALIGNED_MEM
+
+[verilog-files]
+@basedir@/../../verification/formal/riscv/wrapper.sv
+@RTL_RISCV_FILES@
+
+[cover]
+always @* if (!reset) cover (channel[0].cnt_insns == 2);

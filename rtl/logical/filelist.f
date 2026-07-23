@@ -9,6 +9,7 @@
 +incdir+rtl/logical/bus
 
 rtl/logical/common/adder_n_bit.sv
+rtl/logical/common/core_sleep_gate.sv
 rtl/logical/common/mux2to1.sv
 rtl/logical/common/mux3to1.sv
 rtl/logical/common/mux4to1.sv
@@ -38,6 +39,7 @@ rtl/logical/pipeline/if_id_register.sv
 rtl/logical/pipeline/id_ex_register.sv
 rtl/logical/pipeline/ex_mem_register.sv
 rtl/logical/pipeline/mem_wb_register.sv
+rtl/logical/pipeline/rv32i_pipeline.sv
 
 rtl/logical/hazard/forwarding_unit.sv
 rtl/logical/hazard/hazard_detection_unit.sv

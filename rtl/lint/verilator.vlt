@@ -9,7 +9,7 @@ lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/rv32i_top.sv" -match "Signal is 
 
 // The decoded instruction remains a standard 32-bit payload through EX. rd is
 // carried separately, so those five encoding bits are intentionally unused.
-lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/rv32i_core.sv" -match "Bits of signal are not used: 'ex_instruction'[11:7]*"
+lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/pipeline/rv32i_pipeline.sv" -match "Bits of signal are not used: 'ex_instruction'[11:7]*"
 
 // IALIGN=16 makes architectural instruction/trap addresses halfword aligned.
 lint_off -rule UNUSEDSIGNAL -file "*rtl/logical/stages/fetch/rv32c_fetch_buffer.sv" -match "Bits of signal are not used: 'i_pc'[0]*"

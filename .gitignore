@@ -73,8 +73,6 @@ fpga/**/timing/
 # Generic build outputs
 build/
 moduleparamid
-results.xml
-verification/formal/*/
 *.log
 *.tmp
 *.out

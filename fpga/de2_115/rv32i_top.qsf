@@ -44,9 +44,6 @@ set_global_assignment -name ORIGINAL_QUARTUS_VERSION 25.1STD.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "09:20:09  THáNG 11 18, 2025"
 set_global_assignment -name LAST_QUARTUS_VERSION "25.1std.0 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
-set_global_assignment -name EDA_SIMULATION_TOOL "QuestaSim (SystemVerilog)"
-set_global_assignment -name EDA_TIME_SCALE "1 ps" -section_id eda_simulation
-set_global_assignment -name EDA_OUTPUT_DATA_FORMAT "SYSTEMVERILOG HDL" -section_id eda_simulation
 set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_timing
 set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_symbol
 set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_signal_integrity
@@ -56,6 +53,7 @@ set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_RO
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/rv32i_core.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/common/adder_n_bit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/common/core_sleep_gate.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/common/mux2to1.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/common/mux3to1.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/common/mux4to1.sv
@@ -79,8 +77,11 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/if_id_
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/id_ex_register.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/ex_mem_register.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/mem_wb_register.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/rv32i_pipeline.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/hazard/forwarding_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/hazard/hazard_detection_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/bus/native_to_ahb_lite.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/rv32i_top.sv
 set_global_assignment -name SYSTEMVERILOG_FILE de2_115_top.sv
 set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
@@ -206,12 +207,6 @@ set_location_assignment PIN_AF17 -to HEX7[4]
 set_location_assignment PIN_AG18 -to HEX7[5]
 set_location_assignment PIN_AA14 -to HEX7[6]
 set_instance_assignment -name IO_STANDARD "2.5 V" -to HEX7[*]
-set_global_assignment -name EDA_TEST_BENCH_ENABLE_STATUS TEST_BENCH_MODE -section_id eda_simulation
-set_global_assignment -name EDA_NATIVELINK_SIMULATION_TEST_BENCH tb_rv32i_pipeline -section_id eda_simulation
-set_global_assignment -name EDA_TEST_BENCH_NAME tb_rv32i_pipeline -section_id eda_simulation
-set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_rv32i_pipeline
-set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME tb_rv32i_pipeline -section_id tb_rv32i_pipeline
-set_global_assignment -name EDA_TEST_BENCH_FILE ../../rtl/sim/integration/tb_rv32i_pipeline.sv -section_id tb_rv32i_pipeline
 set_global_assignment -name ENABLE_SIGNALTAP ON
 set_global_assignment -name USE_SIGNALTAP_FILE stp3.stp
 set_global_assignment -name SIGNALTAP_FILE stp3.stp

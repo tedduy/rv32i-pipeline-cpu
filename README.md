@@ -6,7 +6,7 @@ CPU RISC-V 32-bit triển khai bằng SystemVerilog, sử dụng pipeline 5 tầ
 IF → ID → EX → MEM → WB
 ```
 
-Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Instruction memory và data memory nằm ngoài CPU; hai giao tiếp dùng handshake `valid`/`ready` để core có thể chờ ROM, Flash, SRAM hoặc interconnect của MCU. Repo đồng thời chứa unit test, integration test, wrapper FPGA DE2-115 và netlist Sky130.
+Thiết kế có data forwarding, load-use hazard detection và flush khi branch/jump. Instruction memory và data memory nằm ngoài CPU; hai giao tiếp dùng handshake `valid`/`ready` để core có thể chờ ROM, Flash, SRAM hoặc interconnect của MCU. Repo đồng thời chứa verification open-source, firmware smoke và wrapper FPGA DE2-115.
 
 Địa chỉ khởi động được cấu hình qua tham số `RESET_VECTOR` của `rv32i_top`; giá trị mặc định là `0x0000_0000`.
 
@@ -52,8 +52,8 @@ tồn tại trong production synthesis.
 
 Đọc theo thứ tự sau để hiểu thiết kế nhanh nhất:
 
-1. [`rtl/logical/rv32i_core.sv`](rtl/logical/rv32i_core.sv) — native-bus core `rv32i_core`, kết nối toàn bộ datapath và control path.
-2. [`rtl/logical/pipeline/`](rtl/logical/pipeline/) — bốn ranh giới của pipeline.
+1. [`rtl/logical/rv32i_core.sv`](rtl/logical/rv32i_core.sv) — public native-bus structural boundary.
+2. [`rtl/logical/pipeline/rv32i_pipeline.sv`](rtl/logical/pipeline/rv32i_pipeline.sv) — kết nối datapath/control và bốn ranh giới pipeline.
 3. [`rtl/logical/stages/fetch/rv32c_fetch_buffer.sv`](rtl/logical/stages/fetch/rv32c_fetch_buffer.sv) và
    [`rtl/logical/stages/decode/rv32c_decompressor.sv`](rtl/logical/stages/decode/rv32c_decompressor.sv) — fetch và giải nén RV32C.
 4. [`rtl/logical/stages/execute/`](rtl/logical/stages/execute/) — ALU cùng multiplier/divider iterative.
@@ -74,21 +74,19 @@ rv32i-pipeline-cpu/
 │   │   ├── bus/              # Native-to-AHB-Lite bridge
 │   │   └── common/           # Adder và mux dùng chung
 │   ├── lint/                 # Verilator lint policy
-│   ├── sim/                  # ACT4 harness và firmware mô phỏng
-│   ├── syn/                  # Synthesis flows
 │   ├── sdc/                  # Timing constraints
-│   ├── cdc/                  # Clock-domain crossing collateral
-│   ├── rdc/                  # Reset-domain crossing collateral
 │   └── doc/                  # RTL và verification documents
 ├── verification/
 │   ├── cocotb/               # Testbench kiến trúc và unit coverage
-│   ├── formal/               # SymbiYosys protocol properties
-│   └── riscv-formal/         # RVFI wrapper và ISA checks
+│   ├── formal/
+│   │   ├── protocol/         # SymbiYosys protocol properties
+│   │   └── riscv/            # RVFI và ISA checks
+│   └── compliance/           # ACT4 profile và harness
+├── firmware/
+│   └── smoke/                # Bare-metal integration test
 ├── mk/                       # Các flow được Makefile nạp
 ├── fpga/
 │   └── de2_115/
-├── asic/
-│   └── sky130/netlist/
 ├── scripts/
 └── Makefile
 ```
@@ -134,6 +132,7 @@ Các lệnh thường dùng:
 ```bash
 make test       # Cocotb trên cả Verilator và Icarus
 make lint       # Dùng setup và ghi report trong rtl/lint/
+make consistency # Kiểm structural boundary và source manifests
 make coverage   # Code-coverage ratchet + functional bins 100%
 make riscv-formal # RVFI ISA/trap/register/PC checks
 make ci         # Lint + test + random + coverage + synthesis + formal
@@ -150,7 +149,7 @@ trường riêng bằng `make act-tools-check`.
 
 ## Architectural compliance (ACT4)
 
-Thư mục [`rtl/sim/compliance/act4/`](rtl/sim/compliance/act4/) chứa cấu hình cho flow ACT4 chính
+Thư mục [`verification/compliance/act4/`](verification/compliance/act4/) chứa cấu hình cho flow ACT4 chính
 thức. Profile hiện tại kiểm tra `I`, `M`, `Zca`, `Zicsr`, `Zifencei` và
 `Zicntr`; machine-mode `Sm` cung cấp architectural context. `ExceptionsSm` được
 điều chỉnh cho `IALIGN=16`, còn `ExceptionsZc` kiểm tra illegal compressed
@@ -188,13 +187,13 @@ make act-m
 Có thể override `ACT_ROOT`, `ACT_TOOL_ROOT` hoặc `ACT_ELF_DIR` nếu muốn dùng
 một installation khác.
 
-`rtl/sim/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
+`verification/compliance/tb_act.sv` cung cấp RAM thống nhất 1 MiB, UART mô phỏng tại
 `0x1000_0000` và thanh ghi pass/fail tại `0x2000_0000`. Script Python đọc trực
 tiếp các segment ELF32 little-endian nên bước chạy DUT không phụ thuộc `objcopy`.
 
 ## Bare-metal C firmware
 
-`rtl/sim/firmware/smoke/` chứa startup assembly, linker script và chương trình C
+`firmware/smoke/` chứa startup assembly, linker script và chương trình C
 freestanding được biên dịch cho `rv32imc_zicsr_zifencei` và link tại reset
 vector `0x0000_0000`. Firmware khởi tạo stack,
 xóa `.bss`, cài `mtvec`, kiểm tra tám lệnh M, đọc `cycle`/`instret`, thực thi
@@ -225,6 +224,8 @@ hợp `rv32i_core`. Đây là synthesizability gate trong `make ci`; kết quả
 ## FPGA
 
 Wrapper và Quartus project DE2-115 nằm tại [`fpga/de2_115/`](fpga/de2_115/).
+Các số liệu timing/resource chỉ được công bố cùng report tái tạo được cho đúng
+commit RTL; repo hiện không giữ số liệu synthesis cũ.
 
 Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
 
@@ -233,6 +234,5 @@ Top-level FPGA là `de2_115_top`; top-level CPU vẫn là `rv32i_top`.
 - [`rtl/doc/verification_report.md`](rtl/doc/verification_report.md)
 - [`rtl/doc/performance_analysis.md`](rtl/doc/performance_analysis.md)
 
-Kết quả xác minh gần nhất cho RV32IMC: RTL regression 32/32, ACT4 90/90 và
-firmware smoke 1/1. Các báo cáo chi tiết trên vẫn ghi lại số liệu area/timing của
-phiên bản trước RV32C và cần được cập nhật sau lần synthesis kế tiếp.
+Hai tài liệu này mô tả acceptance gate và phương pháp đo hiện hành; kết quả
+machine-readable của mỗi lần chạy nằm dưới `build/` và không được commit.

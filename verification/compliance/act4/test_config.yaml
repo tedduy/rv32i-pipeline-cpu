@@ -1,0 +1,8 @@
+name: rv32i-pipeline
+compiler_exe: riscv32-none-elf-gcc
+objdump_exe: riscv32-none-elf-objdump
+ref_model_exe: sail_riscv_sim
+udb_config: rv32i-pipeline.yaml
+linker_script: link.ld
+dut_include_dir: .
+include_priv_tests: true

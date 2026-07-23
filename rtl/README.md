@@ -1,15 +1,13 @@
 # RTL workspace
 
-The RTL workspace separates synthesizable logic from verification and tool
-collateral:
+The RTL workspace contains production design and design-specific policy:
 
 - `logical/`: technology-independent SystemVerilog design sources.
-- `sim/`: unit, integration, compliance and gate-level testbenches.
-- `syn/`: synthesis drivers.
 - `sdc/`: timing constraints.
 - `lint/`: lint rules and waivers.
-- `cdc/`: clock-domain crossing collateral.
-- `rdc/`: reset-domain crossing collateral.
-- `doc/`: design and verification documentation.
+- `doc/`: design policy and maintained reports.
 
-Generated files belong below the repository-level `build/` directory.
+Testbench, formal and compliance sources live under `verification/`; firmware
+lives under `firmware/`. Generated files belong below the repository-level
+`build/` directory, except for the explicitly requested lint log under
+`rtl/lint/reports/`.

@@ -3,8 +3,8 @@
 The open-source verification flow is layered so that each tool has one clear
 responsibility:
 
-- Verilator performs production RTL lint and runs the reusable cocotb tests.
-- Icarus provides simulator-portability regression.
+- Verilator performs production RTL lint and deterministic Cocotb regression.
+- Icarus reruns that deterministic integration suite for simulator portability.
 - Yosys checks that the production RTL remains synthesizable.
 - ACT4 checks architectural RISC-V compliance.
 - SymbiYosys proves bounded interface and retirement invariants.
@@ -47,6 +47,16 @@ cover goals. The separate RVFI shadow path is compiled only with
 `RISCV_FORMAL`; the default bounded gate samples RV32I/RV32C semantics and
 checks illegal traps, register state and PC continuity. The extended target
 generates every RV32IMC instruction job, with deeper bounds for iterative M.
+
+The normal Verilator/Icarus `test` target excludes the randomized scoreboard.
+`random-regression` owns its reviewed seed set, while the coverage run includes
+one deterministic seed because functional bins must be sampled from an
+instrumented execution. This is intentional measurement overlap rather than a
+second regression owner.
+
+All production tools derive RTL sources from `rtl/logical/filelist.f`.
+Formal-tool configs are rendered from the checked-in templates into
+`build/formal/`; tool-specific source lists are not maintained by hand.
 
 ## Commands
 

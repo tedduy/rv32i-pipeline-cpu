@@ -24,4 +24,6 @@ COCOTB_PLUSARGS += +verilator+coverage+file+$(REPO_ROOT)/build/coverage/$(COVERA
 endif
 endif
 
+COCOTB_RESULTS_FILE ?= $(SIM_BUILD)/results.xml
+
 include $(shell cocotb-config --makefiles)/Makefile.sim

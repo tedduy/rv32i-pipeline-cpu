@@ -66,7 +66,12 @@ module rv32i_top #(
     logic [1:0]   dmem_size;
     logic         core_sleep, iahb_busy, dahb_busy;
 
-    assign o_core_sleep = core_sleep && !iahb_busy && !dahb_busy;
+    core_sleep_gate u_sleep_gate (
+        .i_core_sleep(core_sleep),
+        .i_instruction_busy(iahb_busy),
+        .i_data_busy(dahb_busy),
+        .o_core_sleep(o_core_sleep)
+    );
 
     rv32i_core #(
         .N(N),
