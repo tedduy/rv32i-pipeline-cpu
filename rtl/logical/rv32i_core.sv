@@ -91,6 +91,7 @@ module rv32i_core #(
     logic [N-1:0] if_pc_current, if_pc_next, if_pc_sequential;
     logic [N-1:0] if_instruction, if_raw_instruction;
     logic         if_complete, if_compressed, if_access_fault, if_consume;
+    logic         if_request_valid;
     
     // ==========================================================================
     // IF/ID Pipeline Register Signals
@@ -301,7 +302,7 @@ module rv32i_core #(
     assign o_debug_mem_wdata    = mem_store_data;
     assign o_debug_mem_rdata    = mem_load_data;
 
-    assign o_imem_valid   = i_arst_n && !core_sleep;
+    assign o_imem_valid   = i_arst_n && !core_sleep && if_request_valid;
     assign o_core_sleep   = core_sleep;
     assign o_fence_i      = fence_i_taken;
     assign imem_wait      = o_imem_valid && !if_complete;
@@ -386,12 +387,16 @@ module rv32i_core #(
     rv32c_fetch_buffer #(.N(N)) u_if_fetch_buffer (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_flush(system_redirect),
+        // A redirect can remain asserted while a cross-word fetch stalls the
+        // pipeline. Flush only on the cycle that the redirect is actually
+        // accepted; otherwise the first halfword would be discarded forever.
+        .i_flush(pipeline_flush_if_id && pipeline_advance),
         .i_consume(if_consume),
         .i_pc(if_pc_current),
         .i_response_valid(o_imem_valid && i_imem_ready),
         .i_response_data(i_imem_rdata),
         .i_response_error(i_imem_error === 1'b1),
+        .o_request_valid(if_request_valid),
         .o_bus_addr(o_imem_addr),
         .o_complete(if_complete),
         .o_instruction(if_instruction),
@@ -409,15 +414,20 @@ module rv32i_core #(
         if (!i_arst_n) begin
             dmem_complete <= 1'b0;
             dmem_error_pending <= 1'b0;
-            dmem_rdata_latched <= '0;
         end else if (!dmem_request || pipeline_advance) begin
             dmem_complete <= 1'b0;
             dmem_error_pending <= 1'b0;
         end else if (o_dmem_valid && i_dmem_ready) begin
             dmem_complete <= 1'b1;
             dmem_error_pending <= (i_dmem_error === 1'b1);
-            dmem_rdata_latched <= i_dmem_rdata;
         end
+    end
+
+    // Read data is observable only while dmem_complete is set. Avoid placing
+    // this payload register on the asynchronous reset tree.
+    always_ff @(posedge i_clk) begin
+        if (o_dmem_valid && i_dmem_ready && !pipeline_advance)
+            dmem_rdata_latched <= i_dmem_rdata;
     end
     
     // ==========================================================================

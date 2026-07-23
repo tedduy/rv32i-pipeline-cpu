@@ -74,35 +74,20 @@ module iterative_multiplier #(
 
   always_ff @(posedge i_clk or negedge i_arst_n) begin
     if (!i_arst_n) begin
-      state_q          <= MUL_IDLE;
-      iteration_q      <= '0;
-      product_q        <= '0;
-      multiplicand_q   <= '0;
-      negate_result_q  <= 1'b0;
-      select_high_q    <= 1'b0;
+      state_q <= MUL_IDLE;
     end else begin
       unique case (state_q)
         MUL_IDLE: begin
-          if (i_start) begin
-            iteration_q     <= '0;
-            product_q       <= {{N{1'b0}}, operand_b_magnitude};
-            multiplicand_q  <= operand_a_magnitude;
-            negate_result_q <= operand_a_signed ^ operand_b_signed;
-            select_high_q   <= (i_alu_ctrl != ALU_MUL);
+          if (i_start)
             state_q         <= MUL_RUN;
-          end
         end
 
         MUL_RUN: begin
           if (final_iteration) begin
-            product_q <= corrected_product_next;
             if (i_consume)
               state_q <= MUL_IDLE;
             else
               state_q <= MUL_DONE;
-          end else begin
-            product_q   <= magnitude_product_next;
-            iteration_q <= iteration_q + 1'b1;
           end
         end
 
@@ -114,6 +99,34 @@ module iterative_multiplier #(
         default: state_q <= MUL_IDLE;
       endcase
     end
+  end
+
+  // The datapath is fully initialized by i_start before it can affect an
+  // architectural result. Keeping it off the asynchronous reset tree reduces
+  // reset fanout and permits non-resettable datapath flops.
+  always_ff @(posedge i_clk) begin
+    unique case (state_q)
+      MUL_IDLE: begin
+        if (i_start) begin
+          iteration_q     <= '0;
+          product_q       <= {{N{1'b0}}, operand_b_magnitude};
+          multiplicand_q  <= operand_a_magnitude;
+          negate_result_q <= operand_a_signed ^ operand_b_signed;
+          select_high_q   <= (i_alu_ctrl != ALU_MUL);
+        end
+      end
+
+      MUL_RUN: begin
+        if (final_iteration)
+          product_q <= corrected_product_next;
+        else begin
+          product_q   <= magnitude_product_next;
+          iteration_q <= iteration_q + 1'b1;
+        end
+      end
+
+      default: begin end
+    endcase
   end
 
 endmodule

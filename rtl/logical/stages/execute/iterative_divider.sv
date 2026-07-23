@@ -80,57 +80,20 @@ module iterative_divider #(
 
   always_ff @(posedge i_clk or negedge i_arst_n) begin
     if (!i_arst_n) begin
-      state_q              <= DIV_IDLE;
-      iteration_q          <= '0;
-      dividend_q           <= '0;
-      divisor_q            <= '0;
-      quotient_q           <= '0;
-      remainder_q          <= '0;
-      quotient_negative_q  <= 1'b0;
-      remainder_negative_q <= 1'b0;
-      select_remainder_q   <= 1'b0;
-      special_q            <= 1'b0;
-      special_result_q     <= '0;
+      state_q <= DIV_IDLE;
     end else begin
       unique case (state_q)
         DIV_IDLE: begin
-          if (i_start) begin
-            iteration_q          <= '0;
-            dividend_q           <= dividend_magnitude;
-            divisor_q            <= divisor_magnitude;
-            quotient_q           <= '0;
-            remainder_q          <= '0;
-            quotient_negative_q  <= dividend_negative ^ divisor_negative;
-            remainder_negative_q <= dividend_negative;
-            select_remainder_q   <= i_operation[1];
-            special_q            <= divide_by_zero || signed_overflow;
-            if (divide_by_zero)
-              special_result_q <= i_operation[1] ? i_dividend : {N{1'b1}};
-            else if (i_operation[1])
-              special_result_q <= '0;
-            else
-              special_result_q <= i_dividend;
+          if (i_start)
             state_q <= DIV_RUN;
-          end
         end
 
         DIV_RUN: begin
           if (final_iteration) begin
-            if (!special_q) begin
-              quotient_q  <= quotient_corrected;
-              remainder_q <= {1'b0, remainder_corrected};
-            end
             if (i_consume)
               state_q <= DIV_IDLE;
             else
               state_q <= DIV_DONE;
-          end else begin
-            if (!special_q) begin
-              dividend_q  <= dividend_next;
-              quotient_q  <= quotient_next;
-              remainder_q <= remainder_next;
-            end
-            iteration_q <= iteration_q + 1'b1;
           end
         end
 
@@ -142,6 +105,51 @@ module iterative_divider #(
         default: state_q <= DIV_IDLE;
       endcase
     end
+  end
+
+  // All datapath state is overwritten on i_start. Only the FSM requires an
+  // asynchronous reset; payload flops remain unreset to reduce reset-tree area
+  // and fanout without changing operation latency or visible results.
+  always_ff @(posedge i_clk) begin
+    unique case (state_q)
+      DIV_IDLE: begin
+        if (i_start) begin
+          iteration_q          <= '0;
+          dividend_q           <= dividend_magnitude;
+          divisor_q            <= divisor_magnitude;
+          quotient_q           <= '0;
+          remainder_q          <= '0;
+          quotient_negative_q  <= dividend_negative ^ divisor_negative;
+          remainder_negative_q <= dividend_negative;
+          select_remainder_q   <= i_operation[1];
+          special_q            <= divide_by_zero || signed_overflow;
+          if (divide_by_zero)
+            special_result_q <= i_operation[1] ? i_dividend : {N{1'b1}};
+          else if (i_operation[1])
+            special_result_q <= '0;
+          else
+            special_result_q <= i_dividend;
+        end
+      end
+
+      DIV_RUN: begin
+        if (final_iteration) begin
+          if (!special_q) begin
+            quotient_q  <= quotient_corrected;
+            remainder_q <= {1'b0, remainder_corrected};
+          end
+        end else begin
+          if (!special_q) begin
+            dividend_q  <= dividend_next;
+            quotient_q  <= quotient_next;
+            remainder_q <= remainder_next;
+          end
+          iteration_q <= iteration_q + 1'b1;
+        end
+      end
+
+      default: begin end
+    endcase
   end
 
 endmodule
