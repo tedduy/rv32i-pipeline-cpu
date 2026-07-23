@@ -76,7 +76,7 @@ module ex_mem_register #(
             o_jal              <= 1'b0;
             o_jalr             <= 1'b0;
         end else if (i_stall) begin
-            // Keep the memory request stable until ready is asserted.
+            // Keep the stage and any memory request stable during a global stall.
         end else if (i_flush) begin
             o_valid            <= 1'b0;
             o_branch_taken     <= 1'b0;

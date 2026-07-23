@@ -10,7 +10,7 @@ module id_ex_register #(
 )(
     input  logic             i_clk,
     input  logic             i_arst_n,
-    input  logic             i_stall,      // Hold state while memory is waiting
+    input  logic             i_stall,      // Hold state during any global stall
     input  logic             i_flush,      // Flush signal for branch/jump
     
     // Inputs from ID stage
@@ -121,7 +121,7 @@ module id_ex_register #(
             o_fence_i      <= 1'b0;
             o_illegal      <= 1'b0;
         end else if (i_stall) begin
-            // Keep all outputs stable until the pending memory transfer finishes.
+            // Keep all outputs stable until the global pipeline can advance.
         end else if (i_flush) begin
             o_valid        <= 1'b0;
             o_access_fault <= 1'b0;

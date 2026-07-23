@@ -152,13 +152,9 @@ module rv32i_core #(
     logic [N-1:0] ex_jump_target, ex_return_addr;
     logic [N-1:0] ex_rs2_data_forwarded;  // For store operations
     logic [N-1:0] ex_data_addr;
-    logic [N-1:0] ex_mul_result;
-    logic [N-1:0] ex_div_result;
+    logic [N-1:0] ex_mdu_result;
     logic [N-1:0] ex_result;
-    logic         ex_is_mul, mul_start, mul_busy, mul_done;
-    logic         mul_stall, mul_consume;
-    logic         ex_is_div, div_start, div_busy, div_done;
-    logic         div_stall, div_consume;
+    logic         ex_mdu_active, mdu_stall;
 
     // Machine-mode CSR/trap signals
     logic [11:0]  ex_csr_addr;
@@ -229,7 +225,8 @@ module rv32i_core #(
     logic hazard_flush_id_ex, hazard_flush_if_id;
     logic csr_order_stall;
     logic pipeline_flush_id_ex, pipeline_flush_if_id;
-    logic imem_wait, dmem_wait, bus_stall, memory_stall;
+    logic imem_wait, dmem_wait, bus_stall, pipeline_stall, pipeline_advance;
+    logic pc_hold;
     logic dmem_request, dmem_complete, dmem_error_pending;
     logic [N-1:0] dmem_rdata_latched, dmem_response_rdata;
     
@@ -265,7 +262,7 @@ module rv32i_core #(
                     mem_rd2_shadow <= '0;
                     wb_rd1_shadow  <= '0;
                     wb_rd2_shadow  <= '0;
-                end else if (!memory_stall) begin
+                end else if (pipeline_advance) begin
                     if (pipeline_flush_id_ex) begin
                         ex_rd1_shadow <= '0;
                         ex_rd2_shadow <= '0;
@@ -293,7 +290,7 @@ module rv32i_core #(
     assign o_debug_alu_result          = wb_alu_result;
     assign o_debug_wb_data             = wb_data;
     assign o_debug_rd_addr             = wb_rd_addr;
-    assign o_debug_rd_write            = wb_valid && wb_reg_write && !memory_stall;
+    assign o_debug_rd_write            = wb_valid && wb_reg_write && pipeline_advance;
     assign o_debug_mem_write           = mem_mem_write;
     assign o_debug_mem_read            = mem_mem_read;
     assign o_debug_branch_taken        = wb_branch_taken;
@@ -323,16 +320,19 @@ module rv32i_core #(
                                                 : i_dmem_rdata;
     assign dmem_wait      = o_dmem_valid && !i_dmem_ready;
     assign bus_stall      = imem_wait || dmem_wait;
-    assign memory_stall   = bus_stall || mul_stall || div_stall;
-    assign o_debug_stall        = stall_if_id || memory_stall;
+    // One global hold condition freezes every architectural pipeline boundary.
+    // Redirect/trap signals are generated only while pipeline_advance is true.
+    assign pipeline_stall   = bus_stall || mdu_stall;
+    assign pipeline_advance = !pipeline_stall;
+    assign o_debug_stall        = stall_if_id || pipeline_stall;
     assign o_debug_flush        = pipeline_flush_id_ex | pipeline_flush_if_id;
     assign o_debug_immediate    = wb_immediate;
     assign o_debug_alu_uses_immediate       = ex_alu_src;
 
     // A commit pulse represents one architecturally completed instruction.
-    // Gate it during a global memory stall so a held WB payload cannot retire
+    // Gate it during a global pipeline stall so a held WB payload cannot retire
     // more than once.
-    assign o_commit_valid       = wb_valid && !memory_stall;
+    assign o_commit_valid       = wb_valid && pipeline_advance;
     assign o_commit_pc          = wb_pc;
     assign o_commit_instruction = wb_instruction;
     assign o_commit_rd_write    = o_commit_valid && wb_reg_write && (wb_rd_addr != 5'd0);
@@ -376,9 +376,7 @@ module rv32i_core #(
         .i_arst_n(i_arst_n),
         // A taken branch/jump in EX must win over a CSR interlock caused by a
         // younger, wrong-path CSR instruction in ID.
-        .i_pc((core_sleep || memory_stall ||
-               (stall_pc && !system_redirect && !hazard_flush_if_id)) ?
-              if_pc_current : if_pc_next),
+        .i_pc(pc_hold ? if_pc_current : if_pc_next),
         .o_pc(if_pc_current)
     );
     
@@ -402,8 +400,7 @@ module rv32i_core #(
         .o_access_fault(if_access_fault)
     );
 
-    assign if_consume = if_complete && !stall_if_id && !dmem_wait &&
-                        !mul_stall && !div_stall;
+    assign if_consume = if_complete && !stall_if_id && pipeline_advance;
 
     // A data transfer can finish while the instruction side is still waiting.
     // Remember completion, error and read data until the global pipeline can
@@ -413,7 +410,7 @@ module rv32i_core #(
             dmem_complete <= 1'b0;
             dmem_error_pending <= 1'b0;
             dmem_rdata_latched <= '0;
-        end else if (!dmem_request || !memory_stall) begin
+        end else if (!dmem_request || pipeline_advance) begin
             dmem_complete <= 1'b0;
             dmem_error_pending <= 1'b0;
         end else if (o_dmem_valid && i_dmem_ready) begin
@@ -430,7 +427,7 @@ module rv32i_core #(
     if_id_register #(.N(N)) u_if_id_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_stall(stall_if_id || memory_stall),
+        .i_stall(stall_if_id || pipeline_stall),
         .i_flush(pipeline_flush_if_id),
         .i_valid(if_complete),
         .i_access_fault(if_access_fault),
@@ -490,7 +487,7 @@ module rv32i_core #(
     ) u_id_regfile (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_write_enable(wb_valid && wb_reg_write && !memory_stall),
+        .i_write_enable(wb_valid && wb_reg_write && pipeline_advance),
         .i_rs1_addr(id_rs1_addr),
         .i_rs2_addr(id_rs2_addr),
         .i_rd_addr(wb_rd_addr),
@@ -536,8 +533,13 @@ module rv32i_core #(
     assign flush_id_ex     = hazard_flush_id_ex || csr_order_stall;
     assign flush_if_id     = hazard_flush_if_id;
 
-    assign pipeline_flush_if_id = flush_if_id || system_redirect;
-    assign pipeline_flush_id_ex = flush_id_ex || system_redirect;
+    // System redirects have architectural priority over younger hazard state.
+    // ID/EX and later boundaries still hold on pipeline_stall, preserving an
+    // older bus transaction until the cycle in which redirect is permitted.
+    assign pipeline_flush_if_id = system_redirect || flush_if_id;
+    assign pipeline_flush_id_ex = system_redirect || flush_id_ex;
+    assign pc_hold = core_sleep || pipeline_stall ||
+                     (stall_pc && !system_redirect && !hazard_flush_if_id);
     
     // ==========================================================================
     // ID/EX Pipeline Register
@@ -546,7 +548,7 @@ module rv32i_core #(
     id_ex_register #(.N(N)) u_id_ex_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_stall(memory_stall),
+        .i_stall(pipeline_stall),
         .i_flush(pipeline_flush_id_ex),
         .i_valid(id_valid),
         .i_access_fault(id_instruction_access_fault),
@@ -678,54 +680,18 @@ module rv32i_core #(
     // ALU operand B selection (immediate or rs2)
     assign ex_alu_operand_b = ex_alu_src ? ex_immediate : ex_rs2_data_forwarded;
 
-    assign ex_is_mul = ex_valid && !ex_instruction_access_fault &&
-                       (ex_alu_ctrl >= 4'b1010) &&
-                       (ex_alu_ctrl <= 4'b1101);
-    assign mul_start   = ex_is_mul && !mul_busy && !mul_done;
-    assign mul_stall   = ex_is_mul && !mul_done;
-    assign mul_consume = ex_is_mul && mul_done && !bus_stall;
-
-    iterative_multiplier #(.N(N)) u_ex_multiplier (
+    mdu_unit #(.N(N)) u_ex_mdu (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_start(mul_start),
-        .i_consume(mul_consume),
+        .i_valid(ex_valid),
+        .i_instruction_access_fault(ex_instruction_access_fault),
+        .i_instruction(ex_instruction),
         .i_operand_a(ex_alu_operand_a),
         .i_operand_b(ex_alu_operand_b),
-        .i_alu_ctrl(ex_alu_ctrl),
-        .o_busy(mul_busy),
-        .o_done(mul_done),
-        .o_result(ex_mul_result)
-    );
-
-    // A plain case statement gives a deterministic default for an unknown raw
-    // instruction, preventing the global memory stall from becoming X in
-    // simulation while still synthesizing to ordinary field comparators.
-    always_comb begin
-        ex_is_div = 1'b0;
-        if (ex_valid && !ex_instruction_access_fault) begin
-            case ({ex_instruction[31:25], ex_instruction[14],
-                   ex_instruction[6:0]})
-                {7'b0000001, 1'b1, 7'b0110011}: ex_is_div = 1'b1;
-                default:                         ex_is_div = 1'b0;
-            endcase
-        end
-    end
-    assign div_start   = ex_is_div && !div_busy && !div_done;
-    assign div_stall   = ex_is_div && !div_done;
-    assign div_consume = ex_is_div && div_done && !bus_stall;
-
-    iterative_divider #(.N(N)) u_ex_divider (
-        .i_clk(i_clk),
-        .i_arst_n(i_arst_n),
-        .i_start(div_start),
-        .i_consume(div_consume),
-        .i_dividend(ex_alu_operand_a),
-        .i_divisor(ex_alu_operand_b),
-        .i_operation(ex_instruction[13:12]),
-        .o_busy(div_busy),
-        .o_done(div_done),
-        .o_result(ex_div_result)
+        .i_result_ready(!bus_stall),
+        .o_active(ex_mdu_active),
+        .o_stall(mdu_stall),
+        .o_result(ex_mdu_result)
     );
     
     // ALU Unit
@@ -766,7 +732,7 @@ module rv32i_core #(
     );
 
     // CSR instructions read the old CSR value into rd and update the CSR in
-    // EX. Global memory stall gating prevents a held instruction from writing
+    // EX. Global pipeline-stall gating prevents a held instruction from writing
     // the CSR more than once.
     assign ex_csr_addr    = ex_instruction[31:20];
     assign ex_csr_operand = ex_csr_imm ? {{(N-5){1'b0}}, ex_instruction[19:15]}
@@ -786,14 +752,13 @@ module rv32i_core #(
     assign csr_access_illegal = ex_valid && ex_csr_en &&
                                 (!csr_valid || (csr_write_intent && !csr_writable));
     assign csr_write = ex_valid && csr_write_intent && csr_valid && csr_writable &&
-                       !memory_stall && !ex_instruction_access_fault &&
+                       pipeline_advance && !ex_instruction_access_fault &&
                        !data_access_exception && !trap_enter;
     // Keep load/store address generation out of the general ALU result mux.
     // In particular, a misalignment trap must not depend on the multiplier
     // cone merely because MUL shares the same ALU output bus.
     assign ex_data_addr = ex_alu_operand_a_forwarded + ex_immediate;
-    assign ex_result = ex_is_mul ? ex_mul_result :
-                       ex_is_div ? ex_div_result :
+    assign ex_result = ex_mdu_active ? ex_mdu_result :
                        ex_csr_en ? ex_csr_rdata :
                        (ex_mem_read || ex_mem_write) ? ex_data_addr :
                                                       ex_alu_result;
@@ -817,30 +782,31 @@ module rv32i_core #(
     assign load_misaligned_exception = ex_valid && ex_mem_read && data_addr_misaligned;
     assign store_misaligned_exception = ex_valid && ex_mem_write && data_addr_misaligned;
     assign load_access_exception = mem_valid && mem_mem_read &&
-                                   !memory_stall &&
+                                   pipeline_advance &&
                                    (dmem_error_pending ||
                                     (o_dmem_valid && i_dmem_ready &&
                                      (i_dmem_error === 1'b1)));
     assign store_access_exception = mem_valid && mem_mem_write &&
-                                    !memory_stall &&
+                                    pipeline_advance &&
                                     (dmem_error_pending ||
                                      (o_dmem_valid && i_dmem_ready &&
                                       (i_dmem_error === 1'b1)));
     assign data_access_exception = load_access_exception || store_access_exception;
-    assign ex_sync_trap = !memory_stall &&
+    assign ex_sync_trap = pipeline_advance &&
                        (instruction_access_exception || illegal_exception ||
                         instruction_addr_misaligned ||
                         (ex_valid && ex_ebreak) || load_misaligned_exception ||
                         store_misaligned_exception || (ex_valid && ex_ecall));
     assign irq_take = ex_valid && csr_irq_pending && !data_access_exception &&
-                      !ex_sync_trap && !memory_stall;
+                      !ex_sync_trap && pipeline_advance;
     assign trap_enter = data_access_exception || ex_sync_trap || irq_take;
-    assign mret_taken = ex_valid && ex_mret && !data_access_exception && !memory_stall;
+    assign mret_taken = ex_valid && ex_mret && !data_access_exception &&
+                        pipeline_advance;
     assign wfi_sleep = ex_valid && ex_wfi && !data_access_exception &&
-                       !ex_sync_trap && !irq_take && !memory_stall &&
+                       !ex_sync_trap && !irq_take && pipeline_advance &&
                        !csr_wake_pending;
     assign fence_i_taken = ex_valid && ex_fence_i && !data_access_exception &&
-                           !ex_sync_trap && !irq_take && !memory_stall;
+                           !ex_sync_trap && !irq_take && pipeline_advance;
     assign system_redirect = trap_enter || mret_taken || wfi_sleep || fence_i_taken;
     assign trap_vector_base = {csr_mtvec[N-1:2], 2'b00};
     assign trap_vector_offset = {trap_cause[N-3:0], 2'b00};
@@ -936,7 +902,7 @@ module rv32i_core #(
     ex_mem_register #(.N(N)) u_ex_mem_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_stall(memory_stall),
+        .i_stall(pipeline_stall),
         .i_flush(trap_enter),
         .i_valid(ex_valid),
         .i_pc(ex_pc),
@@ -1003,7 +969,7 @@ module rv32i_core #(
     mem_wb_register #(.N(N)) u_mem_wb_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
-        .i_stall(memory_stall),
+        .i_stall(pipeline_stall),
         .i_valid(mem_valid && !data_access_exception),
         .i_pc(mem_pc),
         .i_instruction(mem_instruction),

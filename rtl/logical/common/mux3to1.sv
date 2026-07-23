@@ -15,9 +15,15 @@ module mux3to1 #(
 );
 
     // The forwarding selector is one-hot encoded: 00=local, 01=WB, 10=MEM.
-    // Giving the MEM bit direct priority avoids decoding both select bits on
-    // the EX/MEM bypass path.  The reserved 11 value is never generated.
-    assign o_y = i_sel[1] ? i_d2 :
-                 i_sel[0] ? i_d1 : i_d0;
+    // Drive a benign value for the reserved or unknown selector rather than
+    // allowing an X to spread into address, branch, and MDU datapaths.
+    always_comb begin
+        case (i_sel)
+            2'b00:   o_y = i_d0;
+            2'b01:   o_y = i_d1;
+            2'b10:   o_y = i_d2;
+            default: o_y = '0;
+        endcase
+    end
 
 endmodule
