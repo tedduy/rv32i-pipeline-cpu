@@ -196,7 +196,7 @@ module rv32i_core #(
     // ==========================================================================
     // MEM Stage Signals
     // ==========================================================================
-    logic [N-1:0] mem_load_data, mem_store_data;
+    logic [N-1:0] mem_load_data, mem_store_data, mem_wb_data;
     logic [3:0]   mem_byte_enable;
     
     // ==========================================================================
@@ -204,10 +204,9 @@ module rv32i_core #(
     // ==========================================================================
     logic         wb_valid;
     logic [N-1:0] wb_pc, wb_instruction;
-    logic [N-1:0] wb_alu_result, wb_mem_read_data, wb_return_addr, wb_immediate;
+    logic [N-1:0] wb_alu_result, wb_immediate;
     logic [4:0]   wb_rd_addr;
     logic         wb_reg_write;
-    logic [1:0]   wb_wb_sel;
     logic         wb_mem_write;
     logic [N-1:0] wb_mem_addr, wb_mem_wdata;
     logic [3:0]   wb_mem_wstrb;
@@ -766,9 +765,17 @@ module rv32i_core #(
                        pipeline_advance && !ex_instruction_access_fault &&
                        !data_access_exception && !trap_enter;
     // Keep load/store address generation out of the general ALU result mux.
-    // In particular, a misalignment trap must not depend on the multiplier
-    // cone merely because MUL shares the same ALU output bus.
-    assign ex_data_addr = ex_alu_operand_a_forwarded + ex_immediate;
+    // A carry-select implementation reduces the forwarding-to-mtval path
+    // without making a misalignment trap depend on the shared MDU result bus.
+    adder_n_bit #(
+        .N(N),
+        .USE_CARRY_SELECT(1'b1),
+        .BLOCK_WIDTH(8)
+    ) u_ex_data_addr_adder (
+        .i_a(ex_alu_operand_a_forwarded),
+        .i_b(ex_immediate),
+        .o_sum(ex_data_addr)
+    );
     assign ex_result = ex_mdu_active ? ex_mdu_result :
                        ex_csr_en ? ex_csr_rdata :
                        (ex_mem_read || ex_mem_write) ? ex_data_addr :
@@ -972,6 +979,18 @@ module rv32i_core #(
         .o_store_data(mem_store_data),
         .o_byte_enable(mem_byte_enable)
     );
+
+    // Select the architectural result before the MEM/WB boundary. Forwarding
+    // in the following cycle then starts directly from a registered value
+    // instead of traversing a WB mux on the way back to EX.
+    mux4to1 #(.N(N)) u_mem_wb_data_mux (
+        .i_d0(mem_alu_result),
+        .i_d1(mem_load_data),
+        .i_d2(mem_return_addr),
+        .i_d3(mem_immediate),
+        .i_sel(mem_wb_sel),
+        .o_y(mem_wb_data)
+    );
     
     // ==========================================================================
     // MEM/WB Pipeline Register
@@ -985,12 +1004,10 @@ module rv32i_core #(
         .i_pc(mem_pc),
         .i_instruction(mem_instruction),
         .i_alu_result(mem_alu_result),
-        .i_mem_read_data(mem_load_data),
-        .i_return_addr(mem_return_addr),
+        .i_wb_data(mem_wb_data),
         .i_immediate(mem_immediate),
         .i_rd_addr(mem_rd_addr),
         .i_reg_write(mem_reg_write),
-        .i_wb_sel(mem_wb_sel),
         .i_mem_write(mem_mem_write),
         .i_mem_addr(mem_alu_result),
         .i_mem_wdata(mem_store_data),
@@ -1009,12 +1026,10 @@ module rv32i_core #(
         .o_branch_taken(wb_branch_taken),
         
         .o_alu_result(wb_alu_result),
-        .o_mem_read_data(wb_mem_read_data),
-        .o_return_addr(wb_return_addr),
+        .o_wb_data(wb_data),
         .o_immediate(wb_immediate),
         .o_rd_addr(wb_rd_addr),
         .o_reg_write(wb_reg_write),
-        .o_wb_sel(wb_wb_sel),
         .o_mem_write(wb_mem_write),
         .o_mem_addr(wb_mem_addr),
         .o_mem_wdata(wb_mem_wdata),
@@ -1024,15 +1039,6 @@ module rv32i_core #(
     // ==========================================================================
     // STAGE 5: WRITE BACK (WB)
     // ==========================================================================
-    
-    // Writeback data selection
-    mux4to1 #(.N(N)) u_wb_mux (
-        .i_d0(wb_alu_result),      // WB_ALU - ALU result
-        .i_d1(wb_mem_read_data),   // WB_MEM - Memory data
-        .i_d2(wb_return_addr),     // WB_PC4 - Return address
-        .i_d3(wb_immediate),       // WB_IMM - Immediate (LUI)
-        .i_sel(wb_wb_sel),
-        .o_y(wb_data)
-    );
+    // wb_data is already selected and registered at the MEM/WB boundary.
 
 endmodule

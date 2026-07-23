@@ -9,12 +9,10 @@ module mem_wb_register #(parameter N = 32)(
     
     // Datapath and control inputs from MEM
     input  logic [N-1:0] i_alu_result,
-    input  logic [N-1:0] i_mem_read_data,
-    input  logic [N-1:0] i_return_addr,
+    input  logic [N-1:0] i_wb_data,
     input  logic [N-1:0] i_immediate,
     input  logic [4:0]   i_rd_addr,
     input  logic         i_reg_write,
-    input  logic [1:0]   i_wb_sel,
     input  logic         i_mem_write,
     input  logic [N-1:0] i_mem_addr,
     input  logic [N-1:0] i_mem_wdata,
@@ -30,12 +28,10 @@ module mem_wb_register #(parameter N = 32)(
     output logic [N-1:0] o_pc,
     output logic [N-1:0] o_instruction,
     output logic [N-1:0] o_alu_result,
-    output logic [N-1:0] o_mem_read_data,
-    output logic [N-1:0] o_return_addr,
+    output logic [N-1:0] o_wb_data,
     output logic [N-1:0] o_immediate,
     output logic [4:0]   o_rd_addr,
     output logic         o_reg_write,
-    output logic [1:0]   o_wb_sel,
     output logic         o_mem_write,
     output logic [N-1:0] o_mem_addr,
     output logic [N-1:0] o_mem_wdata,
@@ -54,7 +50,6 @@ module mem_wb_register #(parameter N = 32)(
         if (!i_arst_n) begin
             o_valid         <= 1'b0;
             o_reg_write     <= 1'b0;
-            o_wb_sel        <= '0;
             o_mem_write     <= 1'b0;
             o_jal           <= 1'b0;
             o_jalr          <= 1'b0;
@@ -62,7 +57,6 @@ module mem_wb_register #(parameter N = 32)(
         end else if (!i_stall) begin
             o_valid         <= i_valid;
             o_reg_write     <= i_reg_write;
-            o_wb_sel        <= i_wb_sel;
             o_mem_write     <= i_mem_write;
             o_jal           <= i_jal;
             o_jalr          <= i_jalr;
@@ -78,8 +72,7 @@ module mem_wb_register #(parameter N = 32)(
             o_pc            <= i_pc;
             o_instruction   <= i_instruction;
             o_alu_result    <= i_alu_result;
-            o_mem_read_data <= i_mem_read_data;
-            o_return_addr   <= i_return_addr;
+            o_wb_data       <= i_wb_data;
             o_immediate     <= i_immediate;
             o_rd_addr       <= i_rd_addr;
             o_mem_addr      <= i_mem_addr;
