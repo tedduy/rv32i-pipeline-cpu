@@ -65,9 +65,9 @@ module csr_file #(
     localparam logic [11:0] CSR_MHARTID   = 12'hF14;
     localparam logic [11:0] CSR_MCONFIGPTR = 12'hF15;
 
-    // RV32 (MXL=1) with the base integer extension I (bit 8). Zicsr is not
-    // represented in misa because only single-letter extensions appear there.
-    localparam logic [N-1:0] MISA_VALUE = 32'h4000_0104;
+    // RV32 (MXL=1) with I, M and C. Zicsr is not represented in misa because
+    // only single-letter extensions appear there.
+    localparam logic [N-1:0] MISA_VALUE = 32'h4000_1104;
 
     logic             mstatus_mie;
     logic             mstatus_mpie;

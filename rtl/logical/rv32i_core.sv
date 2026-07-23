@@ -153,9 +153,12 @@ module rv32i_core #(
     logic [N-1:0] ex_rs2_data_forwarded;  // For store operations
     logic [N-1:0] ex_data_addr;
     logic [N-1:0] ex_mul_result;
+    logic [N-1:0] ex_div_result;
     logic [N-1:0] ex_result;
     logic         ex_is_mul, mul_start, mul_busy, mul_done;
     logic         mul_stall, mul_consume;
+    logic         ex_is_div, div_start, div_busy, div_done;
+    logic         div_stall, div_consume;
 
     // Machine-mode CSR/trap signals
     logic [11:0]  ex_csr_addr;
@@ -319,7 +322,7 @@ module rv32i_core #(
                                                 : i_dmem_rdata;
     assign dmem_wait      = o_dmem_valid && !i_dmem_ready;
     assign bus_stall      = imem_wait || dmem_wait;
-    assign memory_stall   = bus_stall || mul_stall;
+    assign memory_stall   = bus_stall || mul_stall || div_stall;
     assign o_debug_stall        = stall_if_id || memory_stall;
     assign o_debug_flush        = pipeline_flush_id_ex | pipeline_flush_if_id;
     assign o_debug_immediate    = wb_immediate;
@@ -398,7 +401,8 @@ module rv32i_core #(
         .o_access_fault(if_access_fault)
     );
 
-    assign if_consume = if_complete && !stall_if_id && !dmem_wait && !mul_stall;
+    assign if_consume = if_complete && !stall_if_id && !dmem_wait &&
+                        !mul_stall && !div_stall;
 
     // A data transfer can finish while the instruction side is still waiting.
     // Remember completion, error and read data until the global pipeline can
@@ -692,6 +696,36 @@ module rv32i_core #(
         .o_done(mul_done),
         .o_result(ex_mul_result)
     );
+
+    // A plain case statement gives a deterministic default for an unknown raw
+    // instruction, preventing the global memory stall from becoming X in
+    // simulation while still synthesizing to ordinary field comparators.
+    always_comb begin
+        ex_is_div = 1'b0;
+        if (ex_valid && !ex_instruction_access_fault) begin
+            case ({ex_instruction[31:25], ex_instruction[14],
+                   ex_instruction[6:0]})
+                {7'b0000001, 1'b1, 7'b0110011}: ex_is_div = 1'b1;
+                default:                         ex_is_div = 1'b0;
+            endcase
+        end
+    end
+    assign div_start   = ex_is_div && !div_busy && !div_done;
+    assign div_stall   = ex_is_div && !div_done;
+    assign div_consume = ex_is_div && div_done && !bus_stall;
+
+    iterative_divider #(.N(N)) u_ex_divider (
+        .i_clk(i_clk),
+        .i_arst_n(i_arst_n),
+        .i_start(div_start),
+        .i_consume(div_consume),
+        .i_dividend(ex_alu_operand_a),
+        .i_divisor(ex_alu_operand_b),
+        .i_operation(ex_instruction[13:12]),
+        .o_busy(div_busy),
+        .o_done(div_done),
+        .o_result(ex_div_result)
+    );
     
     // ALU Unit
     alu_unit #(.N(N)) u_ex_alu (
@@ -758,6 +792,7 @@ module rv32i_core #(
     // cone merely because MUL shares the same ALU output bus.
     assign ex_data_addr = ex_alu_operand_a_forwarded + ex_immediate;
     assign ex_result = ex_is_mul ? ex_mul_result :
+                       ex_is_div ? ex_div_result :
                        ex_csr_en ? ex_csr_rdata :
                        (ex_mem_read || ex_mem_write) ? ex_data_addr :
                                                       ex_alu_result;

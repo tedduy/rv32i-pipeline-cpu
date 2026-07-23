@@ -138,7 +138,7 @@ module control_unit (
         end
         OP_REG: begin
           if (f7 == 7'b0000001)
-            instruction_is_legal = (f3 <= 3'b011); // Zmmul
+            instruction_is_legal = 1'b1; // Full M extension
           else begin
             case (f3)
               3'b000, 3'b101: instruction_is_legal = (f7 == 7'b0000000) ||
@@ -326,6 +326,8 @@ module control_unit (
             3'b001: o_alu_ctrl = ALU_MULH;
             3'b010: o_alu_ctrl = ALU_MULHSU;
             3'b011: o_alu_ctrl = ALU_MULHU;
+            // DIV/DIVU/REM/REMU use the dedicated iterative divider. Their
+            // funct3 is carried in the instruction payload.
             default: o_alu_ctrl = ALU_ADD;
           endcase
         end else begin

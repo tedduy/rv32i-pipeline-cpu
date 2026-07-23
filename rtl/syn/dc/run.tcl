@@ -51,6 +51,7 @@ puts "SYNTH-INFO: top=$top"
 puts "SYNTH-INFO: library=$target_db"
 puts "SYNTH-INFO: clock_period=$clock_period ns"
 puts "SYNTH-INFO: multiplier=iterative-radix2"
+puts "SYNTH-INFO: divider=restoring-radix2"
 puts "SYNTH-INFO: rtl_files=[llength $rtl_files]"
 
 analyze -format sverilog $rtl_files
@@ -76,9 +77,9 @@ compile_ultra -no_autoungroup
 # high-fanout mux and multiplier nodes even though setup/hold already close.
 compile_ultra -incremental -no_autoungroup
 
-# Every radix-2 shift-add step is registered and must meet a normal one-cycle
-# constraint.  Resolve its mapped registers only for a dedicated timing report;
-# no multicycle timing exception is valid or required for this implementation.
+# Every iterative multiply/divide step is registered and must meet a normal
+# one-cycle constraint. Resolve the mapped registers only for dedicated timing
+# reports; no multicycle timing exception is valid for either implementation.
 set mapped_mul_launch_pins [get_pins -hierarchical -quiet \
     -filter "full_name =~ *ex_multiplier/*_q_reg*/Q"]
 set mapped_mul_capture_pins [get_pins -hierarchical -quiet \
@@ -87,9 +88,21 @@ set mapped_mul_capture_pins [add_to_collection $mapped_mul_capture_pins \
     [get_pins -hierarchical -quiet \
         -filter "full_name =~ *ex_mem_reg/o_alu_result_reg*/D"]]
 
+set mapped_div_launch_pins [get_pins -hierarchical -quiet \
+    -filter "full_name =~ *ex_divider/*_q_reg*/Q"]
+set mapped_div_capture_pins [get_pins -hierarchical -quiet \
+    -filter "full_name =~ *ex_divider/*_q_reg*/D"]
+set mapped_div_capture_pins [add_to_collection $mapped_div_capture_pins \
+    [get_pins -hierarchical -quiet \
+        -filter "full_name =~ *ex_mem_reg/o_alu_result_reg*/D"]]
+
 if {[sizeof_collection $mapped_mul_launch_pins] == 0 ||
     [sizeof_collection $mapped_mul_capture_pins] == 0} {
     error "Could not resolve mapped multiplier timing-report pins"
+}
+if {[sizeof_collection $mapped_div_launch_pins] == 0 ||
+    [sizeof_collection $mapped_div_capture_pins] == 0} {
+    error "Could not resolve mapped divider timing-report pins"
 }
 
 redirect -file [file join $output_dir reports check_design.rpt] {
@@ -118,6 +131,12 @@ redirect -file [file join $output_dir reports timing_reg2reg.rpt] {
 redirect -file [file join $output_dir reports timing_multiplier.rpt] {
     report_timing -delay_type max \
         -from $mapped_mul_launch_pins -to $mapped_mul_capture_pins \
+        -max_paths 4 -nworst 1 -path full -input_pins -nets \
+        -transition_time -capacitance
+}
+redirect -file [file join $output_dir reports timing_divider.rpt] {
+    report_timing -delay_type max \
+        -from $mapped_div_launch_pins -to $mapped_div_capture_pins \
         -max_paths 4 -nworst 1 -path full -input_pins -nets \
         -transition_time -capacitance
 }
