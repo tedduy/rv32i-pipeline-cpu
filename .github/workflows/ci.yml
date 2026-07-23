@@ -8,57 +8,275 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: rtl-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  rtl:
-    name: Open-source verification gate
+  build_ci_image:
+    name: Build CI image
+    if: >
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/docker-image.yml
+    with:
+      image-name: ghcr.io/${{ github.repository }}
+      dockerfile: ./Dockerfile.ci
+      tag-prefix: ci-
+    secrets: inherit
+
+  select_ci_image:
+    name: Select CI image
+    needs: build_ci_image
+    if: always()
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    outputs:
+      image-tag: ${{ steps.image.outputs.tag }}
 
     steps:
-      - name: Check out source
-        uses: actions/checkout@v6
-
-      - name: Cache OSS CAD Suite
-        id: oss-cad-cache
-        uses: actions/cache@v4
-        with:
-          path: .tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-${{ hashFiles('scripts/setup_tools.sh') }}
-
-      - name: Install OSS CAD Suite
-        if: steps.oss-cad-cache.outputs.cache-hit != 'true'
+      - name: Select image
+        id: image
         shell: bash
-        run: make oss-cad-setup
+        env:
+          BUILT_IMAGE: ${{ needs.build_ci_image.outputs.image-primary-tag }}
+          FALLBACK_IMAGE: ghcr.io/${{ github.repository }}:ci-main
+        run: |
+          if [[ "${{ needs.build_ci_image.result }}" == "success" && -n "$BUILT_IMAGE" ]]; then
+            echo "tag=$BUILT_IMAGE" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=$(printf '%s' "$FALLBACK_IMAGE" | tr '[:upper:]' '[:lower:]')" \
+              >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Show tool versions
-        shell: bash
-        run: make tools-versions
+  consistency:
+    name: Repository consistency
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make consistency
 
-      - name: Install verification dependencies
-        shell: bash
-        run: make verification-setup
-
-      - name: Run complete RTL gate
-        shell: bash
-        run: make ci
-
-      - name: Upload failure logs
+  lint:
+    name: Verilator lint
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make lint
+      - name: Upload lint logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: rtl-ci-logs
+          name: lint-logs
+          path: rtl/lint/reports/
+          if-no-files-found: ignore
+
+  cocotb_verilator:
+    name: Cocotb (Verilator)
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make cocotb-verilator
+      - name: Upload simulation logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cocotb-verilator-logs
+          path: build/cocotb/
+          if-no-files-found: ignore
+
+  cocotb_iverilog:
+    name: Cocotb (Icarus)
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make cocotb-iverilog
+      - name: Upload simulation logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cocotb-iverilog-logs
+          path: build/cocotb/
+          if-no-files-found: ignore
+
+  random_regression:
+    name: Constrained-random regression
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make random-regression
+      - name: Upload random-regression logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: random-regression-logs
+          path: build/cocotb/
+          if-no-files-found: ignore
+
+  coverage:
+    name: Code and functional coverage
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make coverage
+      - name: Upload coverage results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-results
+          path: build/coverage/
+          if-no-files-found: ignore
+
+  synthesis:
+    name: Yosys synthesis
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make synth-yosys
+      - name: Upload synthesis logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthesis-logs
+          path: build/synth/yosys/
+          if-no-files-found: ignore
+
+  protocol_formal:
+    name: Protocol formal
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make formal
+      - name: Upload protocol-formal logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: protocol-formal-logs
+          path: build/formal/
+          if-no-files-found: ignore
+
+  riscv_formal:
+    name: RISC-V formal
+    needs: select_ci_image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: ${{ needs.select_ci_image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make riscv-formal
+      - name: Upload RISC-V formal logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv-formal-logs
           path: |
-            build/coverage/
-            build/cocotb/
-            build/synth/yosys/
             build/formal/
-            .tools/riscv-formal/cores/rv32i-pipeline/checks/*/status
-            .tools/riscv-formal/cores/rv32i-pipeline/checks/*/logfile.txt
-            .tools/riscv-formal/cores/rv32i-pipeline/checks/*/engine_0/trace.vcd
+            /opt/rv32i-tools/riscv-formal/cores/rv32i-pipeline/checks/*/status
+            /opt/rv32i-tools/riscv-formal/cores/rv32i-pipeline/checks/*/logfile.txt
+            /opt/rv32i-tools/riscv-formal/cores/rv32i-pipeline/checks/*/engine_0/trace.vcd
           if-no-files-found: ignore
           include-hidden-files: true
+
+  rtl_gate:
+    name: Open-source verification gate
+    if: always()
+    needs:
+      - build_ci_image
+      - select_ci_image
+      - consistency
+      - lint
+      - cocotb_verilator
+      - cocotb_iverilog
+      - random_regression
+      - coverage
+      - synthesis
+      - protocol_formal
+      - riscv_formal
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check all required jobs
+        shell: bash
+        env:
+          IMAGE_BUILD_RESULT: ${{ needs.build_ci_image.result }}
+          IMAGE_SELECT_RESULT: ${{ needs.select_ci_image.result }}
+          CONSISTENCY_RESULT: ${{ needs.consistency.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          VERILATOR_RESULT: ${{ needs.cocotb_verilator.result }}
+          ICARUS_RESULT: ${{ needs.cocotb_iverilog.result }}
+          RANDOM_RESULT: ${{ needs.random_regression.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+          SYNTHESIS_RESULT: ${{ needs.synthesis.result }}
+          PROTOCOL_FORMAL_RESULT: ${{ needs.protocol_formal.result }}
+          RISCV_FORMAL_RESULT: ${{ needs.riscv_formal.result }}
+        run: |
+          [[ "$IMAGE_BUILD_RESULT" == "success" || "$IMAGE_BUILD_RESULT" == "skipped" ]]
+          [[ "$IMAGE_SELECT_RESULT" == "success" ]]
+          [[ "$CONSISTENCY_RESULT" == "success" ]]
+          [[ "$LINT_RESULT" == "success" ]]
+          [[ "$VERILATOR_RESULT" == "success" ]]
+          [[ "$ICARUS_RESULT" == "success" ]]
+          [[ "$RANDOM_RESULT" == "success" ]]
+          [[ "$COVERAGE_RESULT" == "success" ]]
+          [[ "$SYNTHESIS_RESULT" == "success" ]]
+          [[ "$PROTOCOL_FORMAL_RESULT" == "success" ]]
+          [[ "$RISCV_FORMAL_RESULT" == "success" ]]

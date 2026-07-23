@@ -1,0 +1,9 @@
+.git
+.tools
+.venv
+build
+rtl/lint/reports
+__pycache__
+*.fst
+*.log
+*.vcd

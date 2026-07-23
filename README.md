@@ -140,6 +140,24 @@ make clean      # Xóa toàn bộ artifact trong build/
 [`verification/README.md`](verification/README.md). CI GitHub chạy cùng lệnh
 `make ci`, nên kết quả local và pull request dùng chung một quality gate.
 
+## Docker CI image
+
+`Dockerfile.ci` đóng gói OSS CAD Suite, Cocotb và riscv-formal vào một image
+Linux x86-64. Source không nằm cố định trong image khi chạy; checkout hiện tại
+được mount tại `/workspace`:
+
+```bash
+docker build -f Dockerfile.ci -t rv32i-pipeline-cpu:ci .
+docker run --rm -v "$PWD:/workspace" rv32i-pipeline-cpu:ci make doctor
+docker run --rm -v "$PWD:/workspace" rv32i-pipeline-cpu:ci make ci
+```
+
+GitHub Actions publish image thành
+`ghcr.io/tedduy/rv32i-pipeline-cpu:ci-main`. PR nội bộ dùng tag riêng
+`ci-pr-<number>`, còn PR từ fork dùng image `ci-main` vì token của fork không
+có quyền ghi package. Package cần được đặt public để contributor bên ngoài có
+thể pull mà không cần quyền trong repository.
+
 RISC-V GCC và ACT4 là dependency tùy chọn, không cần để chạy `make ci`. GCC
 được cài độc lập bằng `make riscv-toolchain-setup` cho firmware smoke; toàn bộ
 ACT4 chỉ cần cho architectural compliance và được kiểm tra riêng bằng

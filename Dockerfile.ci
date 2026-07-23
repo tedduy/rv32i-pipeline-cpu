@@ -1,0 +1,33 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TOOLS_DIR=/opt/rv32i-tools
+ENV VENV=/opt/rv32i-venv
+ENV PATH="/opt/rv32i-venv/bin:/opt/rv32i-tools/oss-cad-suite/bin:${PATH}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        gzip \
+        make \
+        python3 \
+        python3-venv \
+        tar \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . /opt/rv32i-source
+
+RUN make -C /opt/rv32i-source oss-cad-setup \
+        TOOLS_DIR="${TOOLS_DIR}" VENV="${VENV}" \
+    && make -C /opt/rv32i-source verification-setup \
+        TOOLS_DIR="${TOOLS_DIR}" VENV="${VENV}" \
+    && make -C /opt/rv32i-source riscv-formal-setup \
+        TOOLS_DIR="${TOOLS_DIR}" VENV="${VENV}" \
+    && rm -rf "${TOOLS_DIR}/downloads"
+
+WORKDIR /workspace
+
+CMD ["make", "doctor"]
