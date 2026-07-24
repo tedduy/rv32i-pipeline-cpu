@@ -15,11 +15,10 @@ FW_MAX_CYCLES ?= 100000
 FW_COCOTB_BUILD := $(CURDIR)/build/cocotb/verilator-firmware
 
 FW_CFLAGS := -march=$(FW_ARCH) -mabi=ilp32 -mcmodel=medlow \
-	-msmall-data-limit=0 -O2 -g -ffreestanding -fno-builtin -fno-common \
-	-ffunction-sections -fdata-sections -Wall -Wextra -Werror
+        -msmall-data-limit=0 -O2 -g -ffreestanding -fno-builtin -fno-common \
+        -ffunction-sections -fdata-sections -Wall -Wextra -Werror
 FW_LDFLAGS := -nostdlib -nostartfiles -Wl,--gc-sections,--no-relax \
-	-Wl,-Map,$(FW_BUILD_DIR)/$(FW_NAME).map -T $(FW_DIR)/linker.ld
-
+        -Wl,-Map,$(FW_BUILD_DIR)/$(FW_NAME).map -T $(FW_DIR)/linker.ld
 FW_SRCS := $(wildcard $(FW_DIR)/*.c)
 ifeq ($(FW_NAME),smoke)
 FW_SRCS += firmware/common/system.c
@@ -28,6 +27,26 @@ ifeq ($(FW_NAME),dhrystone)
 FW_SRCS += firmware/common/system.c firmware/common/printf.c firmware/common/malloc.c
 # Dhrystone relies on K&R C, ignore some modern C warnings
 FW_CFLAGS += -Wno-implicit-int -Wno-implicit-function-declaration -Wno-return-type -Wno-int-conversion -DTIME -std=gnu89 -Wno-error
+endif
+
+ifeq ($(FW_NAME),freertos)
+FREERTOS_DIR := firmware/freertos/FreeRTOS-Kernel
+FW_SRCS = firmware/freertos/main.c \
+          $(FREERTOS_DIR)/tasks.c \
+          $(FREERTOS_DIR)/list.c \
+          $(FREERTOS_DIR)/queue.c \
+          $(FREERTOS_DIR)/timers.c \
+          $(FREERTOS_DIR)/portable/GCC/RISC-V/port.c \
+          $(FREERTOS_DIR)/portable/GCC/RISC-V/portASM.S \
+          $(FREERTOS_DIR)/portable/MemMang/heap_4.c \
+          firmware/common/printf.c \
+          firmware/common/system.c
+
+FW_CFLAGS += -Ifirmware/freertos \
+             -I$(FREERTOS_DIR)/include \
+             -I$(FREERTOS_DIR)/portable/GCC/RISC-V \
+             -Ifirmware/common \
+             -D__riscv_float_abi_soft -D__riscv_muldiv
 endif
 
 .PHONY: firmware-build firmware-run firmware-run-verilator

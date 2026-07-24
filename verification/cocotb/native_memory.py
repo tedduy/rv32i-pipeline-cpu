@@ -29,6 +29,7 @@ class NativeMemory:
         instruction_error_addresses: Optional[Set[int]] = None,
         data_error_addresses: Optional[Set[int]] = None,
         mmio_write: Optional[Callable[[DataRequest], bool]] = None,
+        mmio_read: Optional[Callable[[int], Optional[int]]] = None,
     ) -> None:
         self.dut = dut
         self.data = bytearray(size)
@@ -37,6 +38,7 @@ class NativeMemory:
         self.instruction_error_addresses = instruction_error_addresses or set()
         self.data_error_addresses = data_error_addresses or set()
         self.mmio_write = mmio_write
+        self.mmio_read = mmio_read
 
         self.instruction_accepts: list[int] = []
         self.data_accepts: list[DataRequest] = []
@@ -72,6 +74,11 @@ class NativeMemory:
         self.data[address:end] = data
 
     def read_word(self, address: int) -> int:
+        if self.mmio_read is not None:
+            val = self.mmio_read(address)
+            if val is not None:
+                return val
+
         base = address & ~0x3
         if base < 0 or base + 4 > len(self.data):
             return 0

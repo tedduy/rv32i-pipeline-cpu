@@ -30,3 +30,22 @@ uint32_t read_instret(void)
     __asm__ volatile ("csrr %0, instret" : "=r" (value));
     return value;
 }
+
+void *memset(void *s, int c, uint32_t n)
+{
+    unsigned char *p = (unsigned char *)s;
+    while (n--) {
+        *p++ = (unsigned char)c;
+    }
+    return s;
+}
+
+void *memcpy(void *dest, const void *src, uint32_t n)
+{
+    unsigned char *d = (unsigned char *)dest;
+    const unsigned char *s = (const unsigned char *)src;
+    while (n--) {
+        *d++ = *s++;
+    }
+    return dest;
+}
