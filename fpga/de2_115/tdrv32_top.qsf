@@ -77,6 +77,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/if_id_
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/id_ex_register.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/ex_mem_register.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/mem_wb_register.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/tdrv32_rvfi_shadow.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/pipeline/tdrv32_pipeline.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/hazard/forwarding_unit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/logical/hazard/hazard_detection_unit.sv

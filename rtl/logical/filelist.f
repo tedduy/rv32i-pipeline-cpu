@@ -39,6 +39,7 @@ rtl/logical/pipeline/if_id_register.sv
 rtl/logical/pipeline/id_ex_register.sv
 rtl/logical/pipeline/ex_mem_register.sv
 rtl/logical/pipeline/mem_wb_register.sv
+rtl/logical/pipeline/tdrv32_rvfi_shadow.sv
 rtl/logical/pipeline/tdrv32_pipeline.sv
 
 rtl/logical/hazard/forwarding_unit.sv

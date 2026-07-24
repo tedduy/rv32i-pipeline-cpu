@@ -265,29 +265,8 @@ module tdrv32_pipeline #(
     logic [N-1:0] mem_forward_data;
 
 `ifdef RISCV_FORMAL
-    // RVFI is a verification-only shadow path. It is absent from normal
-    // simulation and synthesis, so architectural timing and area are unchanged.
-    logic [63:0]  rvfi_order_q;
-    logic         rvfi_have_previous;
-    logic [N-1:0] rvfi_expected_pc;
-    logic         rvfi_commit_valid;
-    logic         rvfi_trap_event, rvfi_trap_pending;
-    logic [N-1:0] rvfi_trap_insn_q;
-    logic [N-1:0] rvfi_trap_pc_q, rvfi_trap_pc_wdata_q;
-    logic [4:0]   rvfi_trap_rs1_addr_q, rvfi_trap_rs2_addr_q;
-    logic [N-1:0] rvfi_trap_rs1_rdata_q, rvfi_trap_rs2_rdata_q;
-    logic [N-1:0] rvfi_trap_mem_addr_q, rvfi_trap_mem_rdata_q;
-    logic [3:0]   rvfi_trap_mem_rmask_q;
-    logic         rvfi_mem_valid_shadow, rvfi_wb_valid_shadow;
-    logic [4:0]   rvfi_mem_rs1_addr, rvfi_mem_rs2_addr;
-    logic [4:0]   rvfi_wb_rs1_addr, rvfi_wb_rs2_addr;
-    logic [N-1:0] rvfi_mem_rs1_rdata, rvfi_mem_rs2_rdata;
-    logic [N-1:0] rvfi_wb_rs1_rdata, rvfi_wb_rs2_rdata;
-    logic [N-1:0] rvfi_mem_pc_wdata, rvfi_wb_pc_wdata;
-    logic [3:0]   rvfi_wb_mem_rmask;
-    logic [N-1:0] rvfi_wb_mem_rdata;
-    logic [N-1:0] rvfi_ex_pc_wdata;
-    logic [3:0]   rvfi_mem_read_mask;
+    // RVFI shadow path is implemented by the tdrv32_rvfi_shadow sub-module.
+    // See the instantiation after the commit output assignments below.
 `endif
     
     // ==========================================================================
@@ -398,150 +377,66 @@ module tdrv32_pipeline #(
     assign o_commit_mem_wstrb   = wb_mem_wstrb;
 
 `ifdef RISCV_FORMAL
-    // Architectural next PC for the instruction currently in EX.
-    always_comb begin
-        rvfi_ex_pc_wdata = ex_pc + (ex_compressed
-                                    ? {{(N-2){1'b0}}, 2'd2}
-                                    : {{(N-3){1'b0}}, 3'd4});
-        if (ex_branch_taken || ex_jal || ex_jalr)
-            rvfi_ex_pc_wdata = control_transfer_target;
-        if (ex_mret)
-            rvfi_ex_pc_wdata = csr_mepc;
-    end
-
-    // The native bus is 32 bits wide. Report aligned memory words and identify
-    // valid load bytes with the mask required by RISCV_FORMAL_ALIGNED_MEM.
-    always_comb begin
-        rvfi_mem_read_mask = 4'b0000;
-        if (mem_mem_read) begin
-            unique case (mem_mem_type)
-                3'b000, 3'b100:
-                    rvfi_mem_read_mask = 4'b0001 << mem_alu_result[1:0];
-                3'b001, 3'b101:
-                    rvfi_mem_read_mask = 4'b0011 << {mem_alu_result[1], 1'b0};
-                3'b010:
-                    rvfi_mem_read_mask = 4'b1111;
-                default:
-                    rvfi_mem_read_mask = 4'b0000;
-            endcase
-        end
-    end
-
-    // Mirror only metadata that the optimized architectural pipeline does not
-    // retain. The shadow valids follow the same hold/flush rules as EX/MEM and
-    // MEM/WB, keeping each packet aligned with o_commit_valid.
-    always_ff @(posedge i_clk or negedge i_arst_n) begin
-        if (!i_arst_n) begin
-            rvfi_mem_valid_shadow <= 1'b0;
-            rvfi_wb_valid_shadow  <= 1'b0;
-            rvfi_order_q          <= 64'b0;
-            rvfi_have_previous    <= 1'b0;
-            rvfi_trap_pending     <= 1'b0;
-        end else begin
-            if (rvfi_valid) begin
-                rvfi_order_q <= rvfi_order_q + 64'd1;
-                rvfi_have_previous <= 1'b1;
-                rvfi_expected_pc <= rvfi_pc_wdata;
-            end
-
-            if (rvfi_trap_event)
-                rvfi_trap_pending <= 1'b1;
-            else if (rvfi_trap_pending && !rvfi_commit_valid)
-                rvfi_trap_pending <= 1'b0;
-
-            if (rvfi_trap_event) begin
-                if (data_access_exception) begin
-                    rvfi_trap_insn_q       <= mem_instruction;
-                    rvfi_trap_pc_q         <= mem_pc;
-                    rvfi_trap_pc_wdata_q   <= mem_pc +
-                        ((mem_instruction[1:0] == 2'b11) ? 32'd4 : 32'd2);
-                    rvfi_trap_rs1_addr_q   <= rvfi_mem_rs1_addr;
-                    rvfi_trap_rs2_addr_q   <= rvfi_mem_rs2_addr;
-                    rvfi_trap_rs1_rdata_q  <= rvfi_mem_rs1_rdata;
-                    rvfi_trap_rs2_rdata_q  <= rvfi_mem_rs2_rdata;
-                    rvfi_trap_mem_addr_q   <= {mem_alu_result[N-1:2], 2'b00};
-                    rvfi_trap_mem_rdata_q  <= dmem_response_rdata;
-                    rvfi_trap_mem_rmask_q  <= rvfi_mem_read_mask;
-                end else begin
-                    rvfi_trap_insn_q       <= ex_raw_instruction;
-                    rvfi_trap_pc_q         <= ex_pc;
-                    rvfi_trap_pc_wdata_q   <= ex_pc +
-                        (ex_compressed ? 32'd2 : 32'd4);
-                    rvfi_trap_rs1_addr_q   <= ex_rs1_addr;
-                    rvfi_trap_rs2_addr_q   <= ex_rs2_addr;
-                    rvfi_trap_rs1_rdata_q  <= ex_alu_operand_a_forwarded;
-                    rvfi_trap_rs2_rdata_q  <= ex_rs2_data_forwarded;
-                    rvfi_trap_mem_addr_q   <= {ex_data_addr[N-1:2], 2'b00};
-                    rvfi_trap_mem_rdata_q  <= '0;
-                    rvfi_trap_mem_rmask_q  <= 4'b0000;
-                end
-            end
-
-            if (!pipeline_stall) begin
-                rvfi_mem_valid_shadow <= ex_valid && !trap_enter;
-                rvfi_wb_valid_shadow  <= rvfi_mem_valid_shadow &&
-                                         !data_access_exception;
-            end
-        end
-    end
-
-    always_ff @(posedge i_clk) begin
-        if (!pipeline_stall) begin
-            rvfi_mem_rs1_addr  <= ex_rs1_addr;
-            rvfi_mem_rs2_addr  <= ex_rs2_addr;
-            rvfi_mem_rs1_rdata <= ex_alu_operand_a_forwarded;
-            rvfi_mem_rs2_rdata <= ex_rs2_data_forwarded;
-            rvfi_mem_pc_wdata  <= rvfi_ex_pc_wdata;
-
-            rvfi_wb_rs1_addr   <= rvfi_mem_rs1_addr;
-            rvfi_wb_rs2_addr   <= rvfi_mem_rs2_addr;
-            rvfi_wb_rs1_rdata  <= rvfi_mem_rs1_rdata;
-            rvfi_wb_rs2_rdata  <= rvfi_mem_rs2_rdata;
-            rvfi_wb_pc_wdata   <= rvfi_mem_pc_wdata;
-            rvfi_wb_mem_rmask  <= rvfi_mem_read_mask;
-            rvfi_wb_mem_rdata  <= dmem_response_rdata;
-        end
-    end
-
-    assign rvfi_commit_valid = o_commit_valid && rvfi_wb_valid_shadow;
-    assign rvfi_trap_event = ex_sync_trap || data_access_exception;
-    assign rvfi_valid     = rvfi_commit_valid || rvfi_trap_pending;
-    assign rvfi_order     = rvfi_order_q;
-    assign rvfi_insn      = rvfi_commit_valid ? wb_instruction
-                                               : rvfi_trap_insn_q;
-    assign rvfi_trap      = !rvfi_commit_valid && rvfi_trap_pending;
-    assign rvfi_halt      = 1'b0;
-    assign rvfi_intr      = rvfi_valid && rvfi_have_previous &&
-                            (rvfi_pc_rdata != rvfi_expected_pc);
-    assign rvfi_mode      = 2'b11;
-    assign rvfi_ixl       = 2'b01;
-    assign rvfi_rs1_addr  = rvfi_commit_valid ? rvfi_wb_rs1_addr
-                                               : rvfi_trap_rs1_addr_q;
-    assign rvfi_rs2_addr  = rvfi_commit_valid ? rvfi_wb_rs2_addr
-                                               : rvfi_trap_rs2_addr_q;
-    assign rvfi_rs1_rdata = (rvfi_rs1_addr == 5'd0) ? '0 :
-                            (rvfi_commit_valid ? rvfi_wb_rs1_rdata
-                                               : rvfi_trap_rs1_rdata_q);
-    assign rvfi_rs2_rdata = (rvfi_rs2_addr == 5'd0) ? '0 :
-                            (rvfi_commit_valid ? rvfi_wb_rs2_rdata
-                                               : rvfi_trap_rs2_rdata_q);
-    assign rvfi_rd_addr   = rvfi_commit_valid && o_commit_rd_write
-                            ? wb_rd_addr : 5'd0;
-    assign rvfi_rd_wdata  = rvfi_commit_valid && o_commit_rd_write
-                            ? wb_data : '0;
-    assign rvfi_pc_rdata  = rvfi_commit_valid ? wb_pc : rvfi_trap_pc_q;
-    assign rvfi_pc_wdata  = rvfi_commit_valid ? rvfi_wb_pc_wdata
-                                               : rvfi_trap_pc_wdata_q;
-    assign rvfi_mem_addr  = rvfi_commit_valid
-                            ? {wb_mem_addr[N-1:2], 2'b00}
-                            : rvfi_trap_mem_addr_q;
-    assign rvfi_mem_rmask = rvfi_commit_valid ? rvfi_wb_mem_rmask
-                                               : rvfi_trap_mem_rmask_q;
-    assign rvfi_mem_wmask = rvfi_commit_valid && wb_mem_write
-                            ? wb_mem_wstrb : 4'b0000;
-    assign rvfi_mem_rdata = rvfi_commit_valid ? rvfi_wb_mem_rdata
-                                               : rvfi_trap_mem_rdata_q;
-    assign rvfi_mem_wdata = rvfi_commit_valid ? wb_mem_wdata : '0;
+    tdrv32_rvfi_shadow #(.N(N)) u_rvfi_shadow (
+        .i_clk(i_clk),
+        .i_arst_n(i_arst_n),
+        .i_pipeline_stall(pipeline_stall),
+        .i_trap_enter(trap_enter),
+        .i_ex_sync_trap(ex_sync_trap),
+        .i_data_access_exception(data_access_exception),
+        .i_ex_valid(ex_valid),
+        .i_ex_pc(ex_pc),
+        .i_ex_compressed(ex_compressed),
+        .i_ex_raw_instruction(ex_raw_instruction),
+        .i_ex_rs1_addr(ex_rs1_addr),
+        .i_ex_rs2_addr(ex_rs2_addr),
+        .i_ex_alu_operand_a_forwarded(ex_alu_operand_a_forwarded),
+        .i_ex_rs2_data_forwarded(ex_rs2_data_forwarded),
+        .i_ex_data_addr(ex_data_addr),
+        .i_ex_branch_taken(ex_branch_taken),
+        .i_ex_jal(ex_jal),
+        .i_ex_jalr(ex_jalr),
+        .i_ex_mret(ex_mret),
+        .i_control_transfer_target(control_transfer_target),
+        .i_csr_mepc(csr_mepc),
+        .i_mem_pc(mem_pc),
+        .i_mem_instruction(mem_instruction),
+        .i_mem_alu_result(mem_alu_result),
+        .i_mem_mem_read(mem_mem_read),
+        .i_mem_mem_type(mem_mem_type),
+        .i_dmem_response_rdata(dmem_response_rdata),
+        .i_commit_valid(o_commit_valid),
+        .i_commit_rd_write(o_commit_rd_write),
+        .i_wb_instruction(wb_instruction),
+        .i_wb_pc(wb_pc),
+        .i_wb_rd_addr(wb_rd_addr),
+        .i_wb_data(wb_data),
+        .i_wb_mem_write(wb_mem_write),
+        .i_wb_mem_addr(wb_mem_addr),
+        .i_wb_mem_wdata(wb_mem_wdata),
+        .i_wb_mem_wstrb(wb_mem_wstrb),
+        .o_rvfi_valid(rvfi_valid),
+        .o_rvfi_order(rvfi_order),
+        .o_rvfi_insn(rvfi_insn),
+        .o_rvfi_trap(rvfi_trap),
+        .o_rvfi_halt(rvfi_halt),
+        .o_rvfi_intr(rvfi_intr),
+        .o_rvfi_mode(rvfi_mode),
+        .o_rvfi_ixl(rvfi_ixl),
+        .o_rvfi_rs1_addr(rvfi_rs1_addr),
+        .o_rvfi_rs2_addr(rvfi_rs2_addr),
+        .o_rvfi_rs1_rdata(rvfi_rs1_rdata),
+        .o_rvfi_rs2_rdata(rvfi_rs2_rdata),
+        .o_rvfi_rd_addr(rvfi_rd_addr),
+        .o_rvfi_rd_wdata(rvfi_rd_wdata),
+        .o_rvfi_pc_rdata(rvfi_pc_rdata),
+        .o_rvfi_pc_wdata(rvfi_pc_wdata),
+        .o_rvfi_mem_addr(rvfi_mem_addr),
+        .o_rvfi_mem_rmask(rvfi_mem_rmask),
+        .o_rvfi_mem_wmask(rvfi_mem_wmask),
+        .o_rvfi_mem_rdata(rvfi_mem_rdata),
+        .o_rvfi_mem_wdata(rvfi_mem_wdata)
+    );
 `endif
     
     // ==========================================================================
