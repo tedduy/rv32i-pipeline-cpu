@@ -6,6 +6,7 @@ SHELL := /bin/bash
 include mk/common.mk
 include mk/tools.mk
 include mk/docker.mk
+include mk/act4-docker.mk
 include mk/openlane.mk
 include mk/consistency.mk
 include mk/doctor.mk
@@ -28,6 +29,7 @@ help:
 	@echo "  make verification-setup  Create .venv and install Cocotb"
 	@echo "  make doctor              Check required local tools"
 	@echo "  make mount               Enter the Docker development environment"
+	@echo "  make mount-act4          Enter the official ACT4 environment"
 	@echo "  make mount-openlane      Enter the OpenLane 2 ASIC environment"
 	@echo "  make test                Run Cocotb on Verilator and Icarus"
 	@echo "  make ci                  Run the complete RTL quality gate"
@@ -43,6 +45,7 @@ help:
 	@echo "  make synth-yosys         Yosys synthesis sanity check"
 	@echo
 	@echo "RISC-V compliance"
+	@echo "  make act4-test           Generate and run only the ACT4 tests"
 	@echo "  make act-generate        Generate the configured ACT4 tests"
 	@echo "  make act-regression      Run all generated ACT4 tests"
 	@echo "  make act-run ELF=<path>  Run one ACT4 ELF"

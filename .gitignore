@@ -12,6 +12,7 @@
 .venv/
 .cache/
 .tools/
+.act4-work/
 __pycache__/
 *.pyc
 

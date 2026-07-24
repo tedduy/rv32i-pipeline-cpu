@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a little-endian ELF32 image into sparse byte-oriented readmemh."""
+"""Convert a little-endian ELF32 image into sparse 32-bit readmemh."""
 
 from __future__ import annotations
 
@@ -62,19 +62,29 @@ def load_segments(path: Path, memory_bytes: int) -> list[tuple[int, bytes]]:
 
 def convert(input_path: Path, output_path: Path, memory_bytes: int) -> None:
     segments = load_segments(input_path, memory_bytes)
+    words: dict[int, bytearray] = {}
+    for address, data in segments:
+        for offset, byte in enumerate(data):
+            byte_address = address + offset
+            word_index = byte_address // 4
+            lane = byte_address % 4
+            words.setdefault(word_index, bytearray(4))[lane] = byte
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="ascii") as output:
-        for address, data in segments:
-            if not data:
-                continue
-            output.write(f"@{address:08x}\n")
-            output.writelines(f"{byte:02x}\n" for byte in data)
+        previous_index = -2
+        for word_index in sorted(words):
+            if word_index != previous_index + 1:
+                output.write(f"@{word_index:08x}\n")
+            value = int.from_bytes(words[word_index], byteorder="little")
+            output.write(f"{value:08x}\n")
+            previous_index = word_index
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("elf", type=Path, help="input ACT4 self-checking ELF")
-    parser.add_argument("output", type=Path, help="output byte-oriented readmemh")
+    parser.add_argument("output", type=Path, help="output 32-bit readmemh")
     parser.add_argument("--memory-bytes", type=int, default=1024 * 1024)
     args = parser.parse_args()
     try:

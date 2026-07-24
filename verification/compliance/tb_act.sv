@@ -1,14 +1,16 @@
 `timescale 1ns/1ps
 
-module tb_act;
+module tb_act #(
+    parameter int unsigned RAM_BYTES = 256 * 1024
+);
 
-    localparam int unsigned RAM_BYTES   = 1024 * 1024;
+    localparam int unsigned RAM_WORDS = RAM_BYTES / 4;
     localparam logic [31:0] UART_ADDR   = 32'h1000_0000;
     localparam logic [31:0] STATUS_ADDR = 32'h2000_0000;
 
     logic        clk;
     logic        arst_n;
-    logic [7:0]  memory [0:RAM_BYTES-1];
+    logic [31:0] memory [0:RAM_WORDS-1];
 
     logic        imem_valid;
     logic [31:0] imem_addr;
@@ -124,15 +126,13 @@ module tb_act;
     always_comb begin
         imem_rdata = 32'h0000_0013;
         if ((imem_addr <= RAM_BYTES - 4) && (imem_addr[1:0] == 2'b00)) begin
-            imem_rdata = {memory[imem_addr + 3], memory[imem_addr + 2],
-                          memory[imem_addr + 1], memory[imem_addr]};
+            imem_rdata = memory[imem_addr[31:2]];
         end
 
         dmem_word_addr = {dmem_addr[31:2], 2'b00};
         dmem_rdata = 32'b0;
         if (dmem_read && (dmem_word_addr <= RAM_BYTES - 4)) begin
-            dmem_rdata = {memory[dmem_word_addr + 3], memory[dmem_word_addr + 2],
-                          memory[dmem_word_addr + 1], memory[dmem_word_addr]};
+            dmem_rdata = memory[dmem_word_addr[31:2]];
         end
     end
 
@@ -152,7 +152,9 @@ module tb_act;
                     $display("ACT4 diagnostic: commits=%0d last_pc=%08x last_inst=%08x",
                              commit_count, last_commit_pc, last_commit_instruction);
                     $display("ACT4 pipeline: IF=%08x ID=%08x EX=%08x MEM=%08x WB=%08x",
-                             dut.if_pc_current, dut.id_pc, dut.ex_pc, dut.mem_pc, dut.wb_pc);
+                             dut.u_pipeline.if_pc_current,
+                             dut.u_pipeline.id_pc, dut.u_pipeline.ex_pc,
+                             dut.u_pipeline.mem_pc, dut.u_pipeline.wb_pc);
                     $display("ACT4 traps: count=%0d first_pc=%08x cause=%08x value=%08x",
                              trap_count, first_trap_pc,
                              first_trap_cause, first_trap_value);
@@ -165,10 +167,14 @@ module tb_act;
                     $fatal(1, "ACT4 self-check reported failure code %0d", dmem_wdata);
                 end
             end else if (dmem_word_addr <= RAM_BYTES - 4) begin
-                if (dmem_wstrb[0]) memory[dmem_word_addr]     <= dmem_wdata[7:0];
-                if (dmem_wstrb[1]) memory[dmem_word_addr + 1] <= dmem_wdata[15:8];
-                if (dmem_wstrb[2]) memory[dmem_word_addr + 2] <= dmem_wdata[23:16];
-                if (dmem_wstrb[3]) memory[dmem_word_addr + 3] <= dmem_wdata[31:24];
+                if (dmem_wstrb[0])
+                    memory[dmem_word_addr[31:2]][7:0] <= dmem_wdata[7:0];
+                if (dmem_wstrb[1])
+                    memory[dmem_word_addr[31:2]][15:8] <= dmem_wdata[15:8];
+                if (dmem_wstrb[2])
+                    memory[dmem_word_addr[31:2]][23:16] <= dmem_wdata[23:16];
+                if (dmem_wstrb[3])
+                    memory[dmem_word_addr[31:2]][31:24] <= dmem_wdata[31:24];
             end
         end
     end
@@ -204,15 +210,15 @@ module tb_act;
                 commit_inst_history[commit_history_index] <= commit_instruction;
                 commit_history_index <= (commit_history_index + 1) & 15;
             end
-            if (dut.trap_enter) begin
+            if (dut.u_pipeline.trap_enter) begin
                 trap_count <= trap_count + 1;
-                last_trap_pc <= dut.ex_pc;
-                last_trap_cause <= dut.trap_cause;
-                last_trap_value <= dut.trap_value;
+                last_trap_pc <= dut.u_pipeline.ex_pc;
+                last_trap_cause <= dut.u_pipeline.trap_cause;
+                last_trap_value <= dut.u_pipeline.trap_value;
                 if (trap_count == 0) begin
-                    first_trap_pc <= dut.ex_pc;
-                    first_trap_cause <= dut.trap_cause;
-                    first_trap_value <= dut.trap_value;
+                    first_trap_pc <= dut.u_pipeline.ex_pc;
+                    first_trap_cause <= dut.u_pipeline.trap_cause;
+                    first_trap_value <= dut.u_pipeline.trap_value;
                 end
             end
             if (dmem_valid && dmem_write) begin
@@ -224,10 +230,12 @@ module tb_act;
                 $display("ACT4 diagnostic: commits=%0d last_pc=%08x last_inst=%08x",
                          commit_count, last_commit_pc, last_commit_instruction);
                 $display("ACT4 pipeline: IF=%08x ID=%08x EX=%08x MEM=%08x WB=%08x",
-                         dut.if_pc_current, dut.id_pc, dut.ex_pc, dut.mem_pc, dut.wb_pc);
+                         dut.u_pipeline.if_pc_current,
+                         dut.u_pipeline.id_pc, dut.u_pipeline.ex_pc,
+                         dut.u_pipeline.mem_pc, dut.u_pipeline.wb_pc);
                 $display("ACT4 traps: count=%0d last_pc=%08x cause=%08x value=%08x mtvec=%08x",
                          trap_count, last_trap_pc, last_trap_cause,
-                         last_trap_value, dut.csr_mtvec);
+                         last_trap_value, dut.u_pipeline.csr_mtvec);
                 $display("ACT4 first trap: pc=%08x cause=%08x value=%08x",
                          first_trap_pc, first_trap_cause, first_trap_value);
                 $display("ACT4 stores: count=%0d last_addr=%08x last_data=%08x",
@@ -253,8 +261,8 @@ module tb_act;
         void'($value$plusargs("TEST_NAME=%s", test_name));
         void'($value$plusargs("MAX_CYCLES=%d", max_cycles));
 
-        for (i = 0; i < RAM_BYTES; i = i + 1)
-            memory[i] = 8'b0;
+        for (i = 0; i < RAM_WORDS; i = i + 1)
+            memory[i] = 32'b0;
         $readmemh(mem_hex, memory);
 
         repeat (4) @(posedge clk);

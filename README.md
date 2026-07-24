@@ -93,9 +93,12 @@ Additional local flows are available:
 ```bash
 make random-regression   # Seeded constrained-random regression
 make coverage            # Code and functional coverage
-make act-regression      # RISC-V Architectural Tests
+make act4-test           # Generate and run only the ACT4 tests
 make synth-yosys         # Yosys synthesis sanity check
 ```
+
+ACT4 uses the official `ghcr.io/riscv/act4-build:act4` image. Use
+`make mount-act4` for an interactive ACT4 shell.
 
 See [verification/README.md](verification/README.md) for the verification plan
 and coverage policy.

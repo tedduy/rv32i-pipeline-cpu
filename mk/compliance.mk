@@ -3,10 +3,11 @@
 ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
 ACT_CONFIG := verification/compliance/act4/test_config.yaml
-ACT_WORK_DIR := build/act4
+ACT_WORK_DIR ?= build/act4
 ACT_SIMV := $(ACT_WORK_DIR)/tb_act.vvp
 ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/tdrv32/elfs
 ACT_MAX_CYCLES ?= 1000000
+ACT_MEMORY_BYTES ?= 262144
 ACT_EXTENSIONS ?= I,M,Zca,Zicsr,Zifencei,Zicntr,ExceptionsZc
 ACT_EXCLUDE_EXTENSIONS ?=
 
@@ -14,6 +15,9 @@ ACT_SM_PATCHES := \
 	verification/compliance/act4/patches/0001-split-exceptions-sm.patch \
 	verification/compliance/act4/patches/0002-fix-ialign32-trap-resume.patch
 
+ifeq ($(ACT_USE_SYSTEM_TOOLS),1)
+ACT_ENV := env
+else
 ACT_ENV := env \
 	PATH="$(ACT_TOOL_ROOT)/bin:$(ACT_TOOL_ROOT)/toolchain/bin:$(ACT_TOOL_ROOT)/sail/bin:$$PATH" \
 	MISE_DATA_DIR="$(ACT_TOOL_ROOT)/mise-data" \
@@ -26,6 +30,7 @@ ACT_ENV := env \
 	XDG_DATA_HOME="$(ACT_TOOL_ROOT)/xdg-data" \
 	XDG_CACHE_HOME="$(ACT_TOOL_ROOT)/xdg-cache" \
 	XDG_CONFIG_HOME="$(ACT_TOOL_ROOT)/xdg-config"
+endif
 
 ACT_GENERATE_ARGS := \
 	CONFIG_FILES="$(abspath $(ACT_CONFIG))" \
@@ -37,12 +42,12 @@ ACT_GENERATE_ARGS := \
 	act-sm-exceptions
 
 act-tools-check:
-	@test -x "$(ACT_TOOL_ROOT)/bin/mise" || { echo "Missing local mise"; exit 1; }
-	@test -x "$(ACT_TOOL_ROOT)/toolchain/bin/riscv32-none-elf-gcc" || { \
-		echo "Missing local RISC-V GCC"; exit 1; \
+	@$(ACT_ENV) sh -c 'command -v mise >/dev/null' || { echo "Missing mise"; exit 1; }
+	@$(ACT_ENV) sh -c 'command -v riscv32-none-elf-gcc >/dev/null' || { \
+		echo "Missing RISC-V GCC"; exit 1; \
 	}
-	@test -x "$(ACT_TOOL_ROOT)/sail/bin/sail_riscv_sim" || { \
-		echo "Missing local Sail model"; exit 1; \
+	@$(ACT_ENV) sh -c 'command -v sail_riscv_sim >/dev/null' || { \
+		echo "Missing Sail model"; exit 1; \
 	}
 	@test -f "$(ACT_ROOT)/Makefile" || { \
 		echo "Missing local riscv-arch-test checkout"; exit 1; \
@@ -61,18 +66,21 @@ act-compile:
 	@$(call require_tool,$(IVERILOG))
 	@mkdir -p "$(ACT_WORK_DIR)"
 	@$(IVERILOG) -g2012 -Wall -Wimplicit -Wno-timescale -s tb_act \
+		-Ptb_act.RAM_BYTES=$(ACT_MEMORY_BYTES) \
 		-o "$(ACT_SIMV)" -f "$(RTL_FILELIST)" verification/compliance/tb_act.sv
 
 act-run: act-compile
 	@test -n "$(ELF)" || { \
 		echo "Specify ELF=/path/to/act4-test.elf"; exit 1; \
 	}
-	@python3 scripts/run_act.py "$(ELF)" --simv "$(ACT_SIMV)" \
-		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
+	@python3 -u scripts/run_act.py "$(ELF)" --simv "$(ACT_SIMV)" \
+		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)" \
+		--memory-bytes "$(ACT_MEMORY_BYTES)"
 
 act-regression: act-compile
-	@python3 scripts/run_act.py "$(ACT_ELF_DIR)" --simv "$(ACT_SIMV)" \
-		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)"
+	@python3 -u scripts/run_act.py "$(ACT_ELF_DIR)" --simv "$(ACT_SIMV)" \
+		--work-dir "$(ACT_WORK_DIR)" --max-cycles "$(ACT_MAX_CYCLES)" \
+		--memory-bytes "$(ACT_MEMORY_BYTES)"
 
 act-zca: ACT_ELF_DIR := $(ACT_WORK_DIR)/generated/tdrv32/elfs/rv32i/Zca
 act-zca: act-regression
