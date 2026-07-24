@@ -1,15 +1,28 @@
 name: image
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile.ci
+      - Makefile
+      - mk/**
+      - scripts/setup_tools.sh
+      - verification/requirements.txt
+      - .github/workflows/docker-image.yml
+  workflow_dispatch:
   workflow_call:
     inputs:
       image-name:
         description: Fully qualified GHCR image name
-        required: true
+        required: false
+        default: ""
         type: string
       dockerfile:
         description: Dockerfile used to build the image
-        required: true
+        required: false
+        default: ./Dockerfile.ci
         type: string
       tag-prefix:
         description: Prefix added to generated image tags
@@ -41,25 +54,28 @@ jobs:
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
           TAG_PREFIX: ${{ inputs.tag-prefix }}
+          DEFAULT_IMAGE_NAME: ghcr.io/${{ github.repository }}
         shell: bash
         run: |
-          image_name="$(printf '%s' "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+          image_name="${IMAGE_NAME:-$DEFAULT_IMAGE_NAME}"
+          image_name="$(printf '%s' "$image_name" | tr '[:upper:]' '[:lower:]')"
+          tag_prefix="${TAG_PREFIX:-ci-}"
           short_sha="${GITHUB_SHA::12}"
 
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            primary="${image_name}:${TAG_PREFIX}pr-${{ github.event.pull_request.number }}"
+            primary="${image_name}:${tag_prefix}pr-${{ github.event.pull_request.number }}"
           elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
-            primary="${image_name}:${TAG_PREFIX}main"
+            primary="${image_name}:${tag_prefix}main"
           else
             ref_name="$(printf '%s' "$GITHUB_REF_NAME" | tr '/_' '--' | tr -cd '[:alnum:].-')"
-            primary="${image_name}:${TAG_PREFIX}${ref_name}"
+            primary="${image_name}:${tag_prefix}${ref_name}"
           fi
 
           {
             echo "primary=$primary"
             echo "tags<<EOF"
             echo "$primary"
-            echo "${image_name}:${TAG_PREFIX}sha-${short_sha}"
+            echo "${image_name}:${tag_prefix}sha-${short_sha}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -77,7 +93,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ inputs.dockerfile }}
+          file: ${{ inputs.dockerfile || './Dockerfile.ci' }}
           push: true
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
