@@ -16,7 +16,9 @@ COVERAGE_SUITES := \
 	ex_mem_register:test_pipeline_register:ex_mem_register \
 	mem_wb_register:test_pipeline_register:mem_wb_register \
 	iterative_multiplier:test_iterative_multiplier:multiplier \
-	iterative_divider:test_iterative_divider:divider
+	iterative_divider:test_iterative_divider:divider \
+	core_sleep_gate:test_core_sleep_gate:core_sleep_gate \
+	native_to_ahb_lite:test_native_to_ahb_lite:native_to_ahb_lite
 COVERAGE_STEMS := $(foreach suite,$(COVERAGE_SUITES),$(word 3,$(subst :, ,$(suite))))
 CORE_HIGH_COVERAGE := build/coverage/core_high.dat
 COVERAGE_FILES := $(addprefix build/coverage/,$(addsuffix .dat,$(COVERAGE_STEMS))) \

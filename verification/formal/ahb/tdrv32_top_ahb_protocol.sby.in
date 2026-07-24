@@ -1,0 +1,25 @@
+[tasks]
+bmc
+cover
+
+[options]
+multiclock on
+bmc: mode bmc
+bmc: depth 40
+cover: mode cover
+cover: depth 40
+
+[engines]
+smtbmc boolector
+
+[script]
+read -formal -sv \
+@RTL_BASENAMES@
+    tdrv32_top_ahb_protocol.sv
+prep -top tdrv32_top_ahb_protocol_formal
+async2sync
+dffunmap
+
+[files]
+@RTL_FILES@
+verification/formal/ahb/tdrv32_top_ahb_protocol.sv

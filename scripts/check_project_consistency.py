@@ -70,6 +70,10 @@ def check_formal_templates() -> None:
     templates = {
         ROOT / "verification/formal/protocol/tdrv32_core_protocol.sby.in":
             "@RTL_BASENAMES@",
+        ROOT / "verification/formal/ahb/native_to_ahb_lite_protocol.sby.in":
+            "@RTL_BASENAMES@",
+        ROOT / "verification/formal/ahb/tdrv32_top_ahb_protocol.sby.in":
+            "@RTL_BASENAMES@",
         ROOT / "verification/formal/riscv/checks.cfg.in":
             "@RTL_RISCV_FILES@",
     }

@@ -32,6 +32,16 @@ Tests must not depend on pipeline hierarchy.
 | `synchronous_exception_matrix_and_fence_i` | Illegal, EBREAK, misaligned load/store traps and FENCE.I |
 | `software_and_timer_interrupt_priority` | Software/timer interrupt causes and priority |
 | `subword_memory_and_complete_branch_matrix` | All byte/halfword lanes and all six branch relations |
+| `read_write_wait_states_and_error_response` | Native-to-AHB address/data phases, backpressure, write-data capture and error response |
+| `reset_recovers_from_address_and_data_phases` | Bridge reset recovery from both AHB transfer phases |
+| `deterministic_random_backpressure_is_exactly_once` | Seeded held-valid traffic, arbitrary address/response waits, errors and stable accepted payloads |
+| `sleep_requires_core_request_and_idle_buses` | Exhaustive sleep gating for instruction/data bus busy combinations |
+| `executes_with_independent_ahb_wait_states` | End-to-end execution and simultaneous instruction/data AHB activity |
+| `subword_accesses_cover_every_ahb_lane` | Every byte lane, both halfword lanes, signed/unsigned loads and AHB sizes |
+| `instruction_ahb_error_enters_precise_trap` | Instruction AHB error cause/PC and suppression of younger retirement |
+| `data_ahb_error_suppresses_side_effect_and_traps` | Load AHB error cause/PC and suppression of register/younger side effects |
+| `store_ahb_error_does_not_modify_memory` | Store AHB error cause/PC, unchanged memory and suppressed younger retirement |
+| `wfi_retires_and_quiesces_ahb` | End-to-end WFI retirement, sleep entry and idle public AHB buses |
 
 Coverage unit suites exhaust all 65,536 RV32C input parcels against an
 independent architectural oracle (28 legal and 19 illegal/reserved functional
@@ -41,9 +51,11 @@ Self-checking full-width suites also verify the configurable reset vector,
 program counter, jump calculations and every pipeline-register payload/control
 field.
 
-The formal protocol harness proves bounded interface and retirement safety for
-arbitrary instruction/data responses and reaches both retirement and data-bus
-cover goals. The separate RVFI shadow path is compiled only with
+The formal protocol harnesses prove bounded core interface/retirement safety
+and native-to-AHB transfer stability, completion/error mapping and reset
+recovery under arbitrary backpressure. They also reach retirement, data-bus,
+successful/error AHB completion and stalled-transfer cover goals. The separate
+RVFI shadow path is compiled only with
 `RISCV_FORMAL`; the default bounded gate samples RV32I/RV32C semantics and
 checks illegal traps, register state and PC continuity. The extended target
 generates every RV32IMC instruction job, with deeper bounds for iterative M.

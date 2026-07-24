@@ -148,16 +148,44 @@ def lw(rd: int, rs1: int, immediate: int) -> int:
     return _i_type(rd, rs1, immediate, 0b010, 0x03)
 
 
-def sw(rs2: int, rs1: int, immediate: int) -> int:
+def lb(rd: int, rs1: int, immediate: int) -> int:
+    return _i_type(rd, rs1, immediate, 0b000, 0x03)
+
+
+def lh(rd: int, rs1: int, immediate: int) -> int:
+    return _i_type(rd, rs1, immediate, 0b001, 0x03)
+
+
+def lbu(rd: int, rs1: int, immediate: int) -> int:
+    return _i_type(rd, rs1, immediate, 0b100, 0x03)
+
+
+def lhu(rd: int, rs1: int, immediate: int) -> int:
+    return _i_type(rd, rs1, immediate, 0b101, 0x03)
+
+
+def _store_type(rs2: int, rs1: int, immediate: int, funct3: int) -> int:
     imm = _signed(immediate, 12)
     return (
         ((imm >> 5) << 25)
         | (rs2 << 20)
         | (rs1 << 15)
-        | (0b010 << 12)
+        | (funct3 << 12)
         | ((imm & 0x1F) << 7)
         | 0x23
     )
+
+
+def sb(rs2: int, rs1: int, immediate: int) -> int:
+    return _store_type(rs2, rs1, immediate, 0b000)
+
+
+def sh(rs2: int, rs1: int, immediate: int) -> int:
+    return _store_type(rs2, rs1, immediate, 0b001)
+
+
+def sw(rs2: int, rs1: int, immediate: int) -> int:
+    return _store_type(rs2, rs1, immediate, 0b010)
 
 
 def beq(rs1: int, rs2: int, immediate: int) -> int:

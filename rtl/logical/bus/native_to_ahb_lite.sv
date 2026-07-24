@@ -83,7 +83,10 @@ module native_to_ahb_lite #(
                     if (i_hready)
                         state_q <= ADDR_PHASE;
                 end
+                // Defensive recovery for an invalid encoded FSM state.
+                /* verilator coverage_off */
                 default: state_q <= ADDR_PHASE;
+                /* verilator coverage_on */
             endcase
         end
     end

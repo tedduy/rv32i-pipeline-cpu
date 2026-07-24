@@ -1,0 +1,25 @@
+[tasks]
+bmc
+cover
+
+[options]
+multiclock on
+bmc: mode bmc
+bmc: depth 20
+cover: mode cover
+cover: depth 20
+
+[engines]
+smtbmc boolector
+
+[script]
+read -formal -sv \
+@RTL_BASENAMES@
+    native_to_ahb_lite_protocol.sv
+prep -top native_to_ahb_lite_protocol_formal
+async2sync
+dffunmap
+
+[files]
+@RTL_FILES@
+verification/formal/ahb/native_to_ahb_lite_protocol.sv

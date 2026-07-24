@@ -6,6 +6,10 @@ RISCV_FORMAL_CORE_DIR := $(RISCV_FORMAL_DIR)/cores/tdrv32
 FORMAL_RENDERER := scripts/render_formal_configs.py
 PROTOCOL_FORMAL_TEMPLATE := verification/formal/protocol/tdrv32_core_protocol.sby.in
 PROTOCOL_FORMAL_CONFIG := build/formal/protocol/tdrv32_core_protocol.sby
+AHB_FORMAL_TEMPLATE := verification/formal/ahb/native_to_ahb_lite_protocol.sby.in
+AHB_FORMAL_CONFIG := build/formal/ahb/native_to_ahb_lite_protocol.sby
+TOP_AHB_FORMAL_TEMPLATE := verification/formal/ahb/tdrv32_top_ahb_protocol.sby.in
+TOP_AHB_FORMAL_CONFIG := build/formal/ahb/tdrv32_top_ahb_protocol.sby
 RISCV_FORMAL_TEMPLATE := verification/formal/riscv/checks.cfg.in
 RISCV_FORMAL_CONFIG := $(CURDIR)/build/formal/riscv/checks.cfg
 RISCV_FORMAL_JOBS ?= 4
@@ -20,7 +24,19 @@ formal:
 		--template "$(PROTOCOL_FORMAL_TEMPLATE)" \
 		--output "$(PROTOCOL_FORMAL_CONFIG)" \
 		--format protocol
+	@$(SYSTEM_PYTHON) "$(FORMAL_RENDERER)" \
+		--filelist "$(RTL_FILELIST)" \
+		--template "$(AHB_FORMAL_TEMPLATE)" \
+		--output "$(AHB_FORMAL_CONFIG)" \
+		--format protocol
+	@$(SYSTEM_PYTHON) "$(FORMAL_RENDERER)" \
+		--filelist "$(RTL_FILELIST)" \
+		--template "$(TOP_AHB_FORMAL_TEMPLATE)" \
+		--output "$(TOP_AHB_FORMAL_CONFIG)" \
+		--format protocol
 	@$(SBY) -f "$(PROTOCOL_FORMAL_CONFIG)"
+	@$(SBY) -f "$(AHB_FORMAL_CONFIG)"
+	@$(SBY) -f "$(TOP_AHB_FORMAL_CONFIG)"
 
 riscv-formal-setup:
 	@if [ ! -d "$(RISCV_FORMAL_DIR)/.git" ]; then \
