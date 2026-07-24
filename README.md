@@ -83,7 +83,7 @@ make test
 GitHub Actions validates:
 
 - Repository consistency and Verilator lint.
-- Cocotb simulation with Verilator and Icarus Verilog.
+- Cocotb simulation with Verilator.
 - Protocol properties with SymbiYosys.
 - ISA-level RVFI checks with `riscv-formal`.
 - Bare-metal, Dhrystone, and FreeRTOS firmware execution.
@@ -91,6 +91,7 @@ GitHub Actions validates:
 Additional local flows are available:
 
 ```bash
+make cocotb-iverilog     # Optional simulator compatibility check
 make random-regression   # Seeded constrained-random regression
 make coverage            # Code and functional coverage
 make act4-test           # Generate and run only the ACT4 tests

@@ -4,7 +4,7 @@ The open-source verification flow is layered so that each tool has one clear
 responsibility:
 
 - Verilator performs production RTL lint and deterministic Cocotb regression.
-- Icarus reruns that deterministic integration suite for simulator portability.
+- Icarus is available as an optional simulator-portability check.
 - Yosys checks that the production RTL remains synthesizable.
 - ACT4 checks architectural RISC-V compliance.
 - SymbiYosys proves bounded interface and retirement invariants.
@@ -76,8 +76,7 @@ Formal-tool configs are rendered from the checked-in templates into
 make setup
 make doctor
 make lint
-make cocotb-verilator
-make cocotb-iverilog
+make test
 make random-regression
 make synth-yosys
 make formal
@@ -95,7 +94,8 @@ The setup target deliberately installs the pinned cocotb release with
 Yosys, but its bundled Python is not used. This keeps the flow compatible with
 RHEL/AlmaLinux 9 and its glibc 2.34 runtime.
 
-The Icarus cocotb target uses the small wrappers under
+Run `make cocotb-iverilog` only when an additional simulator-portability check
+is useful. The Icarus Cocotb target uses the small wrappers under
 `scripts/icarus-cocotb/`. OSS CAD Suite's default `vvp` launcher forces its
 bundled Python runtime, while cocotb must embed the host-compatible Python from
 `.venv`.

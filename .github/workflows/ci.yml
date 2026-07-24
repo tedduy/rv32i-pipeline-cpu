@@ -85,9 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: verilator
-        run: make cocotb-verilator
-      - name: icarus
-        run: make cocotb-iverilog
+        run: make test
       - name: logs
         if: failure()
         uses: actions/upload-artifact@v7

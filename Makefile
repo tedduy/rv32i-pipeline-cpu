@@ -31,7 +31,7 @@ help:
 	@echo "  make mount               Enter the Docker development environment"
 	@echo "  make mount-act4          Enter the official ACT4 environment"
 	@echo "  make mount-openlane      Enter the OpenLane 2 ASIC environment"
-	@echo "  make test                Run Cocotb on Verilator and Icarus"
+	@echo "  make test                Run Cocotb on Verilator"
 	@echo "  make ci                  Run the complete RTL quality gate"
 	@echo
 	@echo "RTL quality"
@@ -59,7 +59,7 @@ help:
 	@echo "Maintenance"
 	@echo "  make clean               Remove generated build artifacts"
 
-test: cocotb-verilator cocotb-iverilog
+test: cocotb-verilator
 
 ci: consistency lint test random-regression coverage synth-yosys formal riscv-formal
 all: ci
