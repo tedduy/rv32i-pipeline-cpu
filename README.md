@@ -1,49 +1,55 @@
 # TDRV32
 
-[![CI](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml/badge.svg)](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml)
-[![RISC-V ISA](https://img.shields.io/badge/RISC--V-ISA-283272?logo=riscv)](https://github.com/riscv/riscv-isa-manual)
-[![OSS CAD Suite](https://img.shields.io/badge/OSS_CAD-Suite-4B32C3)](https://github.com/YosysHQ/oss-cad-suite-build)
-[![Verilator](https://img.shields.io/badge/Verilator-HDL-F2A900)](https://github.com/verilator/verilator)
-[![Icarus Verilog](https://img.shields.io/badge/Icarus-Verilog-0180C5)](https://github.com/steveicarus/iverilog)
-[![Yosys](https://img.shields.io/badge/Yosys-Synthesis-7E57C2)](https://github.com/YosysHQ/yosys)
-[![SymbiYosys](https://img.shields.io/badge/SymbiYosys-Formal-5C4EE5)](https://github.com/YosysHQ/sby)
-[![Boolector](https://img.shields.io/badge/Boolector-SMT-555555)](https://github.com/Boolector/boolector)
-[![Cocotb](https://img.shields.io/badge/Cocotb-Testbench-00A98F)](https://github.com/cocotb/cocotb)
-[![riscv-formal](https://img.shields.io/badge/riscv--formal-RVFI-283272)](https://github.com/YosysHQ/riscv-formal)
-[![RISC-V Architectural Tests](https://img.shields.io/badge/RISC--V-Architectural_Tests-283272)](https://github.com/riscv-non-isa/riscv-arch-test)
-[![OpenLane 2](https://img.shields.io/badge/OpenLane-2-1F6FEB)](https://github.com/efabless/openlane2)
+**TDRV32 is an open-source, five-stage RV32IMC processor core written in
+SystemVerilog.** It is intended for architecture study, RTL verification,
+bare-metal software, FPGA prototyping, and open-source ASIC experimentation.
 
-A 32-bit RISC-V CPU written in SystemVerilog with a five-stage pipeline:
+[![CI](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml/badge.svg)](https://github.com/tedduy/TDRV32/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![SystemVerilog](https://img.shields.io/badge/RTL-SystemVerilog-orange.svg)](rtl/logical)
+[![RISC-V](https://img.shields.io/badge/ISA-RV32IMC-283272?logo=riscv&logoColor=white)](https://github.com/riscv/riscv-isa-manual)
+
+## Overview
 
 ```text
-IF → ID → EX → MEM → WB
+Fetch → Decode → Execute → Memory → Writeback
 ```
 
-## Features
+TDRV32 implements a single-issue, in-order pipeline with forwarding, load-use
+hazard detection, control-flow recovery, iterative multiplication and division,
+and machine-mode system support.
 
-- RV32IMC with Zicsr, Zifencei, and Zicntr.
-- Data forwarding and load-use hazard detection.
-- Pipeline flushing for branches and jumps.
-- Iterative multiplier and divider.
-- Machine-mode CSRs, exceptions, interrupts, `MRET`, and `WFI`.
-- Separate instruction and data native buses with `valid`, `ready`, and fault signaling.
-- Dual AHB-Lite master interfaces through `tdrv32_top`.
-- Commit interface and RVFI support for formal verification.
-- Cocotb, constrained-random, coverage, formal, and ACT4 verification flows.
-- Bare-metal firmware and a DE2-115 FPGA wrapper.
+| Area | Support |
+| --- | --- |
+| ISA | RV32IMC, Zicsr, Zifencei, Zicntr |
+| Pipeline | Five-stage, single-issue, in-order |
+| Hazards | Data forwarding, load-use stalls, branch and jump flushes |
+| System | Machine-mode CSRs, exceptions, interrupts, `MRET`, `WFI` |
+| Memory | Separate instruction and data native interfaces |
+| Integration | Dual AHB-Lite master wrapper |
+| Verification | Commit interface and RVFI |
+
+The primary integration boundaries are:
+
+- `tdrv32_core`: processor core with native instruction and data interfaces.
+- `tdrv32_top`: system wrapper exposing dual AHB-Lite master interfaces.
+- `tdrv32_pipeline`: five-stage pipeline implementation.
 
 ## Quick Start
 
-Requirements: Git, Docker, and GNU Make.
+### Docker
+
+Docker is the recommended environment. Clone the repository and initialize the
+FreeRTOS kernel submodule:
 
 ```bash
 git clone https://github.com/tedduy/TDRV32.git
 cd TDRV32
+git submodule update --init
 make mount
 ```
 
-`make mount` pulls the CI image and opens a shell at `/workspace`. All tools
-required for RTL verification are included in the container.
+Inside the container:
 
 ```bash
 make doctor
@@ -53,7 +59,18 @@ make formal
 make riscv-formal
 ```
 
-To work without Docker:
+`make mount` pulls `ghcr.io/tedduy/tdrv32:ci-main` when needed and mounts the
+repository at `/workspace`.
+
+If the repository was cloned without submodules, initialize them with:
+
+```bash
+git submodule update --init
+```
+
+### Local toolchain
+
+To install the pinned tools directly in the repository:
 
 ```bash
 make setup
@@ -61,53 +78,96 @@ make doctor
 make test
 ```
 
-## Common Commands
+## Verification
+
+GitHub Actions validates:
+
+- Repository consistency and Verilator lint.
+- Cocotb simulation with Verilator and Icarus Verilog.
+- Protocol properties with SymbiYosys.
+- ISA-level RVFI checks with `riscv-formal`.
+- Bare-metal, Dhrystone, and FreeRTOS firmware execution.
+
+Additional local flows are available:
 
 ```bash
-make help                # List all targets
-make lint                # Run Verilator lint
-make test                # Run Cocotb with Verilator and Icarus
-make random-regression   # Run constrained-random tests
-make coverage            # Measure code and functional coverage
-make formal              # Prove protocol properties
-make riscv-formal        # Run RVFI ISA checks
-make synth-yosys         # Run a synthesis sanity check
-make firmware-run        # Run the bare-metal smoke test
-make ci                  # Run the complete local quality gate
+make random-regression   # Seeded constrained-random regression
+make coverage            # Code and functional coverage
+make act-regression      # RISC-V Architectural Tests
+make synth-yosys         # Yosys synthesis sanity check
 ```
 
-## OpenLane
+See [verification/README.md](verification/README.md) for the verification plan
+and coverage policy.
 
-Enter the OpenLane 2 environment:
+## Firmware
+
+TDRV32 includes three software workloads:
+
+| Workload | Purpose |
+| --- | --- |
+| `smoke` | Startup, traps, counters, M extension, and `FENCE.I` |
+| `dhrystone` | Integer workload and performance reporting |
+| `freertos` | Timer interrupts, task scheduling, and context switching |
+
+Run a workload through Cocotb and Verilator:
+
+```bash
+make firmware-run FW_NAME=smoke
+make firmware-run FW_NAME=dhrystone FW_MAX_CYCLES=1000000
+make firmware-run FW_NAME=freertos FW_MAX_CYCLES=1000000
+```
+
+The FreeRTOS kernel is tracked as a Git submodule under
+`firmware/freertos/FreeRTOS-Kernel`.
+
+## FPGA and ASIC
+
+The [DE2-115 directory](fpga/de2_115) contains the Intel FPGA integration and
+Quartus project files.
+
+Open an OpenLane 2 development shell with:
 
 ```bash
 make mount-openlane
 ```
 
-The repository is mounted at `/workspace`. PDK data is persisted in the
+The repository is mounted at `/workspace`; PDK data persists in the
 `tdrv32-openlane-pdk` Docker volume.
 
-## Repository Layout
+## Repository Structure
 
 ```text
-rtl/logical/              Synthesizable RTL
-verification/cocotb/     Cocotb testbench
-verification/formal/     Protocol and riscv-formal checks
-verification/compliance/ ACT4 configuration
-firmware/smoke/          Bare-metal firmware
-fpga/de2_115/            DE2-115 Quartus project
-mk/                      Make targets
-scripts/                 Tool setup and utilities
+rtl/logical/              Synthesizable SystemVerilog RTL
+rtl/sdc/                  Timing constraints
+verification/cocotb/     Simulation testbench
+verification/formal/     Protocol and RVFI formal checks
+verification/compliance/ Architectural test configuration
+firmware/                Bare-metal, Dhrystone, and FreeRTOS software
+fpga/de2_115/            DE2-115 FPGA integration
+mk/                      Modular Make targets
+scripts/                 Setup and automation utilities
 ```
 
-Recommended starting points:
+Recommended entry points:
 
-1. [`tdrv32_core.sv`](rtl/logical/tdrv32_core.sv)
-2. [`tdrv32_pipeline.sv`](rtl/logical/pipeline/tdrv32_pipeline.sv)
-3. [`test_core.py`](verification/cocotb/test_core.py)
+- [tdrv32_core.sv](rtl/logical/tdrv32_core.sv)
+- [tdrv32_pipeline.sv](rtl/logical/pipeline/tdrv32_pipeline.sv)
+- [test_core.py](verification/cocotb/test_core.py)
 
-See [`verification/README.md`](verification/README.md) for the verification
-plan and coverage policy.
+## Open-Source Toolchain
+
+TDRV32 is developed and verified with
+[OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build),
+[Verilator](https://github.com/verilator/verilator),
+[Icarus Verilog](https://github.com/steveicarus/iverilog),
+[Yosys](https://github.com/YosysHQ/yosys),
+[SymbiYosys](https://github.com/YosysHQ/sby),
+[Boolector](https://github.com/Boolector/boolector),
+[Cocotb](https://github.com/cocotb/cocotb),
+[riscv-formal](https://github.com/YosysHQ/riscv-formal),
+[RISC-V Architectural Tests](https://github.com/riscv-non-isa/riscv-arch-test),
+and [OpenLane 2](https://github.com/efabless/openlane2).
 
 ## License
 

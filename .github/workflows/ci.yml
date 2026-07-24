@@ -1,7 +1,6 @@
 name: ci
 
 on:
-  push:
   pull_request:
   merge_group:
   workflow_dispatch:
@@ -126,6 +125,42 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
 
+  firmware:
+    name: firmware (${{ matrix.workload }})
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        workload:
+          - smoke
+          - dhrystone
+          - freertos
+    container:
+      image: ${{ needs.image.outputs.image-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: run
+        env:
+          FW_NAME: ${{ matrix.workload }}
+          FW_MAX_CYCLES: 1000000
+        run: make firmware-run
+      - name: logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware-${{ matrix.workload }}-logs
+          path: |
+            build/firmware/${{ matrix.workload }}/
+            build/cocotb/verilator-firmware/
+          if-no-files-found: ignore
+
   result:
     name: result
     if: always()
@@ -135,6 +170,7 @@ jobs:
       - lint
       - test
       - formal
+      - firmware
     runs-on: ubuntu-24.04
     steps:
       - name: verify
@@ -145,9 +181,11 @@ jobs:
           LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
           FORMAL_RESULT: ${{ needs.formal.result }}
+          FIRMWARE_RESULT: ${{ needs.firmware.result }}
         run: |
           [[ "$IMAGE_BUILD_RESULT" == "success" || "$IMAGE_BUILD_RESULT" == "skipped" ]]
           [[ "$IMAGE_SELECT_RESULT" == "success" ]]
           [[ "$LINT_RESULT" == "success" ]]
           [[ "$TEST_RESULT" == "success" ]]
           [[ "$FORMAL_RESULT" == "success" ]]
+          [[ "$FIRMWARE_RESULT" == "success" ]]

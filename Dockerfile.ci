@@ -25,6 +25,8 @@ COPY . /opt/tdrv32-source
 
 RUN make -C /opt/tdrv32-source oss-cad-setup \
         TOOLS_DIR="${TOOLS_DIR}" VENV="${VENV}" \
+    && make -C /opt/tdrv32-source riscv-toolchain-setup \
+        TOOLS_DIR="${TOOLS_DIR}" VENV="${VENV}" \
     && make -C /opt/tdrv32-source verification-setup \
         TOOLS_DIR="${TOOLS_DIR}" VENV="${VENV}" \
     && make -C /opt/tdrv32-source riscv-formal-setup \

@@ -31,6 +31,8 @@ module id_ex_register #(
     input  logic             i_reg_write,
     input  logic             i_mem_read,
     input  logic             i_mem_write,
+    input  logic             i_rs1_read,
+    input  logic             i_rs2_read,
     input  logic [1:0]       i_wb_sel,
     input  logic [1:0]       i_pc_sel,
     input  logic             i_alu_src,
@@ -69,6 +71,8 @@ module id_ex_register #(
     output logic             o_reg_write,
     output logic             o_mem_read,
     output logic             o_mem_write,
+    output logic             o_rs1_read,
+    output logic             o_rs2_read,
     output logic [1:0]       o_wb_sel,
     output logic [1:0]       o_pc_sel,
     output logic             o_alu_src,
@@ -101,6 +105,8 @@ module id_ex_register #(
             o_reg_write    <= 1'b0;
             o_mem_read     <= 1'b0;
             o_mem_write    <= 1'b0;
+            o_rs1_read     <= 1'b0;
+            o_rs2_read     <= 1'b0;
             o_wb_sel       <= 2'b0;
             o_pc_sel       <= 2'b0;
             o_alu_src      <= 1'b0;
@@ -129,6 +135,8 @@ module id_ex_register #(
             o_reg_write    <= 1'b0;
             o_mem_read     <= 1'b0;
             o_mem_write    <= 1'b0;
+            o_rs1_read     <= 1'b0;
+            o_rs2_read     <= 1'b0;
             o_wb_sel       <= 2'b0;
             o_pc_sel       <= 2'b0;
             o_alu_src      <= 1'b0;
@@ -155,6 +163,8 @@ module id_ex_register #(
             o_reg_write    <= i_reg_write;
             o_mem_read     <= i_mem_read;
             o_mem_write    <= i_mem_write;
+            o_rs1_read     <= i_rs1_read;
+            o_rs2_read     <= i_rs2_read;
             o_wb_sel       <= i_wb_sel;
             o_pc_sel       <= i_pc_sel;
             o_alu_src      <= i_alu_src;

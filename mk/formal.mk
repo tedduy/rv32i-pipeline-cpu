@@ -61,6 +61,8 @@ riscv-formal-generate: riscv-formal-setup
 	@cp "$(RISCV_FORMAL_CONFIG)" "$(RISCV_FORMAL_CORE_DIR)/checks.cfg"
 	@cd "$(RISCV_FORMAL_CORE_DIR)" && \
 		"$(SYSTEM_PYTHON)" ../../checks/genchecks.py
+	@sed -i '/^\[file defines\.sv\]$$/a `define TDRV32_FORMAL_REG_HISTORY' \
+		"$(RISCV_FORMAL_CORE_DIR)/checks/reg_ch0.sby"
 
 riscv-formal: riscv-formal-generate
 	@$(call require_tool,$(SBY))
@@ -89,6 +91,8 @@ riscv-formal-all: riscv-formal-setup
 		> "$(RISCV_FORMAL_CORE_DIR)/checks-all.cfg"
 	@cd "$(RISCV_FORMAL_CORE_DIR)" && \
 		"$(SYSTEM_PYTHON)" ../../checks/genchecks.py checks-all
+	@sed -i '/^\[file defines\.sv\]$$/a `define TDRV32_FORMAL_REG_HISTORY' \
+		"$(RISCV_FORMAL_CORE_DIR)/checks-all/reg_ch0.sby"
 	@$(MAKE) --no-print-directory -j$(RISCV_FORMAL_JOBS) \
 		-C "$(RISCV_FORMAL_CORE_DIR)/checks-all"
 	@set -e; \

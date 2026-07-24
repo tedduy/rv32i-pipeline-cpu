@@ -159,6 +159,10 @@ module tdrv32_pipeline #(
     logic [N-1:0] ex_rs1_data, ex_rs2_data, ex_immediate;
     logic [4:0]   ex_rs1_addr, ex_rs2_addr, ex_rd_addr;
     logic         ex_reg_write, ex_mem_read, ex_mem_write;
+    // Consumed by the RVFI shadow only when RISCV_FORMAL is enabled.
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic         ex_rs1_read, ex_rs2_read;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic [1:0]   ex_wb_sel, ex_pc_sel;
     logic         ex_alu_src, ex_alu_a_sel;
     logic [3:0]   ex_alu_ctrl;
@@ -390,6 +394,8 @@ module tdrv32_pipeline #(
         .i_ex_raw_instruction(ex_raw_instruction),
         .i_ex_rs1_addr(ex_rs1_addr),
         .i_ex_rs2_addr(ex_rs2_addr),
+        .i_ex_rs1_read(ex_rs1_read),
+        .i_ex_rs2_read(ex_rs2_read),
         .i_ex_alu_operand_a_forwarded(ex_alu_operand_a_forwarded),
         .i_ex_rs2_data_forwarded(ex_rs2_data_forwarded),
         .i_ex_data_addr(ex_data_addr),
@@ -403,7 +409,9 @@ module tdrv32_pipeline #(
         .i_mem_instruction(mem_instruction),
         .i_mem_alu_result(mem_alu_result),
         .i_mem_mem_read(mem_mem_read),
+        .i_mem_mem_write(mem_mem_write),
         .i_mem_mem_type(mem_mem_type),
+        .i_mem_store_operand(mem_store_data_forwarded),
         .i_dmem_response_rdata(dmem_response_rdata),
         .i_commit_valid(o_commit_valid),
         .i_commit_rd_write(o_commit_rd_write),
@@ -676,6 +684,8 @@ module tdrv32_pipeline #(
         .i_reg_write(id_reg_write),
         .i_mem_read(id_mem_read),
         .i_mem_write(id_mem_write),
+        .i_rs1_read(id_rs1_read),
+        .i_rs2_read(id_rs2_read),
         .i_wb_sel(id_wb_sel),
         .i_pc_sel(id_pc_sel),
         .i_alu_src(id_alu_src),
@@ -710,6 +720,8 @@ module tdrv32_pipeline #(
         .o_reg_write(ex_reg_write),
         .o_mem_read(ex_mem_read),
         .o_mem_write(ex_mem_write),
+        .o_rs1_read(ex_rs1_read),
+        .o_rs2_read(ex_rs2_read),
         .o_wb_sel(ex_wb_sel),
         .o_pc_sel(ex_pc_sel),
         .o_alu_src(ex_alu_src),

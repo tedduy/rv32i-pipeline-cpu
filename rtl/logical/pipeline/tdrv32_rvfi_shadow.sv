@@ -25,6 +25,8 @@ module tdrv32_rvfi_shadow #(
     input  logic [N-1:0] i_ex_raw_instruction,
     input  logic [4:0]   i_ex_rs1_addr,
     input  logic [4:0]   i_ex_rs2_addr,
+    input  logic         i_ex_rs1_read,
+    input  logic         i_ex_rs2_read,
     input  logic [N-1:0] i_ex_alu_operand_a_forwarded,
     input  logic [N-1:0] i_ex_rs2_data_forwarded,
     input  logic [N-1:0] i_ex_data_addr,
@@ -40,7 +42,9 @@ module tdrv32_rvfi_shadow #(
     input  logic [N-1:0] i_mem_instruction,
     input  logic [N-1:0] i_mem_alu_result,
     input  logic         i_mem_mem_read,
+    input  logic         i_mem_mem_write,
     input  logic [2:0]   i_mem_mem_type,
+    input  logic [N-1:0] i_mem_store_operand,
     input  logic [N-1:0] i_dmem_response_rdata,
 
     // WB / commit observability
@@ -106,6 +110,14 @@ module tdrv32_rvfi_shadow #(
     logic [N-1:0] rvfi_wb_mem_rdata;
     logic [N-1:0] rvfi_ex_pc_wdata;
     logic [3:0]   rvfi_mem_read_mask;
+    logic [N-1:0] rvfi_rs1_observed, rvfi_rs2_observed;
+`ifdef TDRV32_FORMAL_REG_HISTORY
+    logic [4:0]   rvfi_write_addr_history [0:7];
+    logic [N-1:0] rvfi_write_data_history [0:7];
+    logic [7:0]   rvfi_write_valid_history;
+    integer       rvfi_history_shift_index;
+    integer       rvfi_history_lookup_index;
+`endif
 
     // =========================================================================
     // Architectural next PC for the instruction currently in EX.
@@ -154,7 +166,31 @@ module tdrv32_rvfi_shadow #(
             rvfi_order_q          <= 64'b0;
             rvfi_have_previous    <= 1'b0;
             rvfi_trap_pending     <= 1'b0;
+`ifdef TDRV32_FORMAL_REG_HISTORY
+            rvfi_write_valid_history <= '0;
+`endif
         end else begin
+`ifdef TDRV32_FORMAL_REG_HISTORY
+            if (o_rvfi_valid && !o_rvfi_trap &&
+                (o_rvfi_rd_addr != 5'd0)) begin
+                for (rvfi_history_shift_index = 7;
+                     rvfi_history_shift_index > 0;
+                     rvfi_history_shift_index =
+                         rvfi_history_shift_index - 1) begin
+                    rvfi_write_addr_history[rvfi_history_shift_index] <=
+                        rvfi_write_addr_history[rvfi_history_shift_index - 1];
+                    rvfi_write_data_history[rvfi_history_shift_index] <=
+                        rvfi_write_data_history[rvfi_history_shift_index - 1];
+                    rvfi_write_valid_history[rvfi_history_shift_index] <=
+                        rvfi_write_valid_history[
+                            rvfi_history_shift_index - 1];
+                end
+                rvfi_write_addr_history[0] <= o_rvfi_rd_addr;
+                rvfi_write_data_history[0] <= o_rvfi_rd_wdata;
+                rvfi_write_valid_history[0] <= 1'b1;
+            end
+`endif
+
             if (o_rvfi_valid) begin
                 rvfi_order_q <= rvfi_order_q + 64'd1;
                 rvfi_have_previous <= 1'b1;
@@ -175,7 +211,9 @@ module tdrv32_rvfi_shadow #(
                     rvfi_trap_rs1_addr_q   <= rvfi_mem_rs1_addr;
                     rvfi_trap_rs2_addr_q   <= rvfi_mem_rs2_addr;
                     rvfi_trap_rs1_rdata_q  <= rvfi_mem_rs1_rdata;
-                    rvfi_trap_rs2_rdata_q  <= rvfi_mem_rs2_rdata;
+                    rvfi_trap_rs2_rdata_q  <= i_mem_mem_write
+                                            ? i_mem_store_operand
+                                            : rvfi_mem_rs2_rdata;
                     rvfi_trap_mem_addr_q   <= {i_mem_alu_result[N-1:2], 2'b00};
                     rvfi_trap_mem_rdata_q  <= i_dmem_response_rdata;
                     rvfi_trap_mem_rmask_q  <= rvfi_mem_read_mask;
@@ -184,10 +222,14 @@ module tdrv32_rvfi_shadow #(
                     rvfi_trap_pc_q         <= i_ex_pc;
                     rvfi_trap_pc_wdata_q   <= i_ex_pc +
                         (i_ex_compressed ? 32'd2 : 32'd4);
-                    rvfi_trap_rs1_addr_q   <= i_ex_rs1_addr;
-                    rvfi_trap_rs2_addr_q   <= i_ex_rs2_addr;
-                    rvfi_trap_rs1_rdata_q  <= i_ex_alu_operand_a_forwarded;
-                    rvfi_trap_rs2_rdata_q  <= i_ex_rs2_data_forwarded;
+                    rvfi_trap_rs1_addr_q   <= i_ex_rs1_read
+                                            ? i_ex_rs1_addr : 5'd0;
+                    rvfi_trap_rs2_addr_q   <= i_ex_rs2_read
+                                            ? i_ex_rs2_addr : 5'd0;
+                    rvfi_trap_rs1_rdata_q  <= i_ex_rs1_read
+                                            ? i_ex_alu_operand_a_forwarded : '0;
+                    rvfi_trap_rs2_rdata_q  <= i_ex_rs2_read
+                                            ? i_ex_rs2_data_forwarded : '0;
                     rvfi_trap_mem_addr_q   <= {i_ex_data_addr[N-1:2], 2'b00};
                     rvfi_trap_mem_rdata_q  <= '0;
                     rvfi_trap_mem_rmask_q  <= 4'b0000;
@@ -207,16 +249,21 @@ module tdrv32_rvfi_shadow #(
     // =========================================================================
     always_ff @(posedge i_clk) begin
         if (!i_pipeline_stall) begin
-            rvfi_mem_rs1_addr  <= i_ex_rs1_addr;
-            rvfi_mem_rs2_addr  <= i_ex_rs2_addr;
-            rvfi_mem_rs1_rdata <= i_ex_alu_operand_a_forwarded;
-            rvfi_mem_rs2_rdata <= i_ex_rs2_data_forwarded;
+            rvfi_mem_rs1_addr  <= i_ex_rs1_read ? i_ex_rs1_addr : 5'd0;
+            rvfi_mem_rs2_addr  <= i_ex_rs2_read ? i_ex_rs2_addr : 5'd0;
+            rvfi_mem_rs1_rdata <= i_ex_rs1_read
+                                ? i_ex_alu_operand_a_forwarded : '0;
+            rvfi_mem_rs2_rdata <= i_ex_rs2_read
+                                ? i_ex_rs2_data_forwarded : '0;
             rvfi_mem_pc_wdata  <= rvfi_ex_pc_wdata;
 
             rvfi_wb_rs1_addr   <= rvfi_mem_rs1_addr;
             rvfi_wb_rs2_addr   <= rvfi_mem_rs2_addr;
             rvfi_wb_rs1_rdata  <= rvfi_mem_rs1_rdata;
-            rvfi_wb_rs2_rdata  <= rvfi_mem_rs2_rdata;
+            // Store data can receive a late WB-to-MEM forwarding update after
+            // EX. Report the value actually consumed by the memory operation.
+            rvfi_wb_rs2_rdata  <= i_mem_mem_write
+                                ? i_mem_store_operand : rvfi_mem_rs2_rdata;
             rvfi_wb_pc_wdata   <= rvfi_mem_pc_wdata;
             rvfi_wb_mem_rmask  <= rvfi_mem_read_mask;
             rvfi_wb_mem_rdata  <= i_dmem_response_rdata;
@@ -242,12 +289,36 @@ module tdrv32_rvfi_shadow #(
                                                : rvfi_trap_rs1_addr_q;
     assign o_rvfi_rs2_addr  = rvfi_commit_valid ? rvfi_wb_rs2_addr
                                                : rvfi_trap_rs2_addr_q;
-    assign o_rvfi_rs1_rdata = (o_rvfi_rs1_addr == 5'd0) ? '0 :
-                            (rvfi_commit_valid ? rvfi_wb_rs1_rdata
-                                               : rvfi_trap_rs1_rdata_q);
-    assign o_rvfi_rs2_rdata = (o_rvfi_rs2_addr == 5'd0) ? '0 :
-                            (rvfi_commit_valid ? rvfi_wb_rs2_rdata
-                                               : rvfi_trap_rs2_rdata_q);
+    always_comb begin
+        rvfi_rs1_observed = rvfi_commit_valid ? rvfi_wb_rs1_rdata
+                                              : rvfi_trap_rs1_rdata_q;
+        rvfi_rs2_observed = rvfi_commit_valid ? rvfi_wb_rs2_rdata
+                                              : rvfi_trap_rs2_rdata_q;
+`ifdef TDRV32_FORMAL_REG_HISTORY
+        // Eight entries cover every earlier retirement visible at the
+        // configured 12-cycle register proof without burdening ISA checks.
+        for (rvfi_history_lookup_index = 7;
+             rvfi_history_lookup_index >= 0;
+             rvfi_history_lookup_index =
+                 rvfi_history_lookup_index - 1) begin
+            if (rvfi_write_valid_history[rvfi_history_lookup_index] &&
+                (rvfi_write_addr_history[rvfi_history_lookup_index] ==
+                 o_rvfi_rs1_addr))
+                rvfi_rs1_observed =
+                    rvfi_write_data_history[rvfi_history_lookup_index];
+            if (rvfi_write_valid_history[rvfi_history_lookup_index] &&
+                (rvfi_write_addr_history[rvfi_history_lookup_index] ==
+                 o_rvfi_rs2_addr))
+                rvfi_rs2_observed =
+                    rvfi_write_data_history[rvfi_history_lookup_index];
+        end
+`endif
+    end
+
+    assign o_rvfi_rs1_rdata = (o_rvfi_rs1_addr == 5'd0)
+                            ? '0 : rvfi_rs1_observed;
+    assign o_rvfi_rs2_rdata = (o_rvfi_rs2_addr == 5'd0)
+                            ? '0 : rvfi_rs2_observed;
     assign o_rvfi_rd_addr   = rvfi_commit_valid && i_commit_rd_write
                             ? i_wb_rd_addr : 5'd0;
     assign o_rvfi_rd_wdata  = rvfi_commit_valid && i_commit_rd_write
