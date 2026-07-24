@@ -11,6 +11,11 @@ module hazard_detection_unit (
     input  logic [4:0]  i_id_rs1_addr,
     input  logic [4:0]  i_id_rs2_addr,
     
+    // Register read intent from ID stage
+    input  logic        i_id_rs1_read,
+    input  logic        i_id_rs2_read,
+    input  logic        i_id_mem_write,  // 1 if ID instruction is a store
+    
     // Inputs from EX stage (instruction currently in execute)
     input  logic [4:0]  i_ex_rd_addr,
     input  logic        i_ex_mem_read,
@@ -37,9 +42,13 @@ module hazard_detection_unit (
     // Occurs when:
     // 1. Current EX stage instruction is a LOAD (mem_read = 1)
     // 2. Current EX stage instruction writes to a register (reg_write = 1)
-    // 3. Current ID stage instruction reads from the same register
-    //    (either rs1 or rs2 matches EX's rd)
+    // 3. Current ID stage instruction actually reads from that register
+    //    (either rs1_read=1 and rs1 matches, or rs2_read=1 and rs2 matches)
     // 4. The destination register is not x0
+    // 5. EXCEPTION: If the ID instruction is a STORE (mem_write=1), and it
+    //    only depends on the load for its data to store (rs2 matches), we DO
+    //    NOT stall. The store data will be forwarded in the MEM stage.
+    //    (If it depends on rs1 for the address, we still must stall).
     //
     // Solution: Stall for 1 cycle
     // ==========================================================================
@@ -49,8 +58,10 @@ module hazard_detection_unit (
         
         // Check if EX stage has a load instruction
         if (i_ex_mem_read && i_ex_reg_write && (i_ex_rd_addr != 5'b0)) begin
-            // Check if ID stage reads from EX's destination register
-            if ((i_id_rs1_addr == i_ex_rd_addr) || (i_id_rs2_addr == i_ex_rd_addr)) begin
+            // Check if ID stage actually reads from EX's destination register
+            if ((i_id_rs1_addr == i_ex_rd_addr) && i_id_rs1_read) begin
+                load_use_hazard = 1'b1;
+            end else if ((i_id_rs2_addr == i_ex_rd_addr) && i_id_rs2_read && !i_id_mem_write) begin
                 load_use_hazard = 1'b1;
             end
         end

@@ -24,6 +24,11 @@ module control_unit (
   output logic        o_jal,             // JAL instruction → Jump Unit
   output logic        o_jalr,            // JALR instruction → Jump Unit
 
+  // Register read status (for hazard detection optimization)
+  output logic        o_rs1_read,
+  output logic        o_rs2_read,
+
+
   // Machine-mode SYSTEM/CSR control signals
   output logic        o_csr_en,
   output logic [1:0]  o_csr_op,           // 00=write, 01=set, 10=clear
@@ -188,6 +193,8 @@ module control_unit (
     o_mret       = 1'b0;
     o_wfi        = 1'b0;
     o_fence_i     = 1'b0;
+    o_rs1_read    = 1'b0;
+    o_rs2_read    = 1'b0;
 
     case (opcode)
       // ======================================================================
@@ -227,6 +234,7 @@ module control_unit (
         // JALR rd, rs1, imm - Jump and Link Register
         o_jalr     = 1'b1;       // Signal to Jump Unit
         o_reg_write = 1'b1;
+        o_rs1_read  = 1'b1;
         o_alu_src   = 1'b1;       // Use immediate for target calculation
         o_wb_sel    = WB_PC4;     // Return address → register
         o_pc_sel    = PC_JALR;    // PC ← (rs1 + I-imm) & ~1
@@ -240,6 +248,8 @@ module control_unit (
         o_branch_en   = 1'b1;     // Enable Branch Unit
         o_branch_type = funct3;   // Branch type → Branch Unit
         o_pc_sel      = PC_BRANCH; // PC ← PC + B-imm (if taken)
+        o_rs1_read    = 1'b1;
+        o_rs2_read    = 1'b1;
         // ALU not used - Branch Unit handles rs1 vs rs2 comparison
       end
 
@@ -249,6 +259,7 @@ module control_unit (
       OP_LOAD: begin
         o_mem_read  = 1'b1;       // Enable memory read
         o_reg_write = 1'b1;
+        o_rs1_read  = 1'b1;
         o_alu_src   = 1'b1;       // Use immediate for address calculation
         o_wb_sel    = WB_MEM;     // Memory data → register
         o_alu_ctrl  = ALU_ADD;    // Address = rs1 + I-imm
@@ -260,6 +271,8 @@ module control_unit (
       // ======================================================================
       OP_STORE: begin
         o_mem_write = 1'b1;       // Enable memory write
+        o_rs1_read  = 1'b1;
+        o_rs2_read  = 1'b1;
         o_alu_src   = 1'b1;       // Use immediate for address calculation
         o_alu_ctrl  = ALU_ADD;    // Address = rs1 + S-imm
         o_mem_type  = funct3;     // Memory type → Load/Store Unit
@@ -271,6 +284,7 @@ module control_unit (
       // ======================================================================
       OP_IMM: begin
         o_reg_write = 1'b1;
+        o_rs1_read  = 1'b1;
         o_alu_src   = 1'b1;       // Use immediate as operand B
         o_wb_sel    = WB_ALU;     // ALU result → register
         
@@ -302,6 +316,8 @@ module control_unit (
       // ======================================================================
       OP_REG: begin
         o_reg_write = 1'b1;
+        o_rs1_read  = 1'b1;
+        o_rs2_read  = 1'b1;
         o_wb_sel    = WB_ALU;     // ALU result → register
         // ALUSrc = 0 (use rs2), ALUASel = 0 (use rs1)
 
@@ -371,6 +387,8 @@ module control_unit (
             o_reg_write   = 1'b1;
             o_wb_sel      = WB_ALU;
             o_csr_imm     = funct3[2];
+            // rs1 is read only for non-immediate CSR operations
+            o_rs1_read    = !funct3[2];
             case (funct3[1:0])
               2'b01: o_csr_op = 2'b00; // CSRRW/CSRRWI
               2'b10: o_csr_op = 2'b01; // CSRRS/CSRRSI

@@ -557,6 +557,8 @@ module tdrv32_pipeline #(
     assign id_rs2_addr = id_instruction[24:20];
     assign id_rd_addr  = id_instruction[11:7];
     
+    logic id_rs1_read, id_rs2_read;
+    
     // Control Unit
     control_unit u_id_control (
         .i_instruction(id_instruction),
@@ -573,6 +575,8 @@ module tdrv32_pipeline #(
         .o_mem_type(id_mem_type),
         .o_jal(id_jal),
         .o_jalr(id_jalr),
+        .o_rs1_read(id_rs1_read),
+        .o_rs2_read(id_rs2_read),
         .o_csr_en(id_csr_en),
         .o_csr_op(id_csr_op),
         .o_csr_imm(id_csr_imm),
@@ -613,6 +617,9 @@ module tdrv32_pipeline #(
     hazard_detection_unit u_hazard_unit (
         .i_id_rs1_addr(id_rs1_addr),
         .i_id_rs2_addr(id_rs2_addr),
+        .i_id_rs1_read(id_rs1_read),
+        .i_id_rs2_read(id_rs2_read),
+        .i_id_mem_write(id_mem_write),
         .i_ex_rd_addr(ex_rd_addr),
         .i_ex_mem_read(ex_mem_read),
         .i_ex_reg_write(ex_reg_write),
@@ -1025,6 +1032,8 @@ module tdrv32_pipeline #(
     // EX/MEM Pipeline Register
     // ==========================================================================
     
+    logic [4:0] mem_rs2_addr;
+    
     ex_mem_register #(.N(N)) u_ex_mem_reg (
         .i_clk(i_clk),
         .i_arst_n(i_arst_n),
@@ -1037,6 +1046,7 @@ module tdrv32_pipeline #(
         .i_rs2_data(ex_rs2_data_forwarded),
         .i_return_addr(ex_return_addr),
         .i_immediate(ex_immediate),
+        .i_rs2_addr(ex_rs2_addr),
         .i_rd_addr(ex_rd_addr),
         .i_branch_taken(ex_branch_taken),
         .i_reg_write(ex_reg_write),
@@ -1058,6 +1068,7 @@ module tdrv32_pipeline #(
         .o_rs2_data(mem_rs2_data),
         .o_return_addr(mem_return_addr),
         .o_immediate(mem_immediate),
+        .o_rs2_addr(mem_rs2_addr),
         .o_rd_addr(mem_rd_addr),
         .o_branch_taken(mem_branch_taken),
         .o_reg_write(mem_reg_write),
@@ -1072,13 +1083,16 @@ module tdrv32_pipeline #(
     // ==========================================================================
     
     // Load/Store Unit
+    logic [N-1:0] mem_store_data_forwarded;
+    assign mem_store_data_forwarded = (wb_valid && wb_reg_write && (wb_rd_addr != 5'd0) && (wb_rd_addr == mem_rs2_addr)) ? wb_data : mem_rs2_data;
+
     load_store_unit #(.N(N)) u_mem_lsu (
         .i_mem_type(mem_mem_type),
         .i_mem_read(mem_mem_read),
         .i_mem_write(mem_mem_write),
         .i_byte_offset(mem_alu_result[1:0]),
         .i_mem_read_data(dmem_response_rdata),
-        .i_store_data(mem_rs2_data),
+        .i_store_data(mem_store_data_forwarded),
         .o_load_data(mem_load_data),
         .o_store_data(mem_store_data),
         .o_byte_enable(mem_byte_enable)
