@@ -4,7 +4,8 @@ ACT_TOOL_ROOT ?= $(CURDIR)/.tools/act4
 ACT_ROOT ?= $(ACT_TOOL_ROOT)/riscv-arch-test
 ACT_CONFIG := verification/compliance/act4/test_config.yaml
 ACT_WORK_DIR ?= build/act4
-ACT_SIMV := $(ACT_WORK_DIR)/tb_act.vvp
+ACT_OBJ_DIR := $(ACT_WORK_DIR)/obj_dir
+ACT_SIMV := $(ACT_OBJ_DIR)/tb_act
 ACT_ELF_DIR ?= $(ACT_WORK_DIR)/generated/tdrv32/elfs
 ACT_MAX_CYCLES ?= 1000000
 ACT_MEMORY_BYTES ?= 262144
@@ -63,11 +64,15 @@ act-generate: act-tools-check
 		EXCLUDE_EXTENSIONS="$(ACT_EXCLUDE_EXTENSIONS)"
 
 act-compile:
-	@$(call require_tool,$(IVERILOG))
+	@$(call require_tool,$(VERILATOR))
 	@mkdir -p "$(ACT_WORK_DIR)"
-	@$(IVERILOG) -g2012 -Wall -Wimplicit -Wno-timescale -s tb_act \
-		-Ptb_act.RAM_BYTES=$(ACT_MEMORY_BYTES) \
-		-o "$(ACT_SIMV)" -f "$(RTL_FILELIST)" verification/compliance/tb_act.sv
+	@$(VERILATOR) --binary --timing --build-jobs 0 \
+		-Wno-fatal -Wno-DECLFILENAME -Wno-PINCONNECTEMPTY \
+		-Wno-TIMESCALEMOD -Wno-WIDTHTRUNC \
+		--top-module tb_act \
+		--Mdir "$(ACT_OBJ_DIR)" -o tb_act \
+		-GRAM_BYTES=$(ACT_MEMORY_BYTES) \
+		-f "$(RTL_FILELIST)" verification/compliance/tb_act.sv
 
 act-run: act-compile
 	@test -n "$(ELF)" || { \
